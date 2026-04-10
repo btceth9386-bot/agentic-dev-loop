@@ -345,8 +345,75 @@ def test_write_state_log_updates_symlink(tmp_path, base_config):
 
 
 # ---------------------------------------------------------------------------
-# Notifications
+# fetch_pr_context
 # ---------------------------------------------------------------------------
+
+def test_fetch_pr_context_no_pr():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("[]")):
+        assert d.fetch_pr_context(42, "/repo") is None
+
+
+def test_fetch_pr_context_with_pr():
+    pr_list = [{"number": 7, "url": "https://github.com/x/y/pull/7", "title": "Fix #42"}]
+    pr_detail = {
+        "number": 7, "url": "https://github.com/x/y/pull/7", "title": "Fix #42",
+        "reviews": [{"author": {"login": "bob"}, "body": "Looks good"}],
+        "comments": [],
+    }
+    responses = [_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]
+    with patch("dispatcher.subprocess.run", side_effect=responses):
+        result = d.fetch_pr_context(42, "/repo")
+    assert "# Pull Request #7" in result
+    assert "Fix #42" in result
+    assert "Looks good" in result
+
+
+def test_fetch_pr_context_gh_failure():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("", returncode=1)):
+        assert d.fetch_pr_context(42, "/repo") is None
+
+
+# ---------------------------------------------------------------------------
+# post_assignment_comment
+# ---------------------------------------------------------------------------
+
+def test_post_assignment_comment_normal():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("")) as mock:
+        d.post_assignment_comment(42, "kiro", "coding", 1, "/repo")
+    body = mock.call_args[0][0]
+    assert "attempt 1" in " ".join(body)
+    assert "kiro" in " ".join(body)
+
+
+def test_post_assignment_comment_retry():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("")) as mock:
+        d.post_assignment_comment(42, "kiro", "coding", 2, "/repo", is_retry=True)
+    body = mock.call_args[0][0]
+    assert "retry attempt 2" in " ".join(body)
+
+
+# ---------------------------------------------------------------------------
+# write_issue_context with pr_context
+# ---------------------------------------------------------------------------
+
+def test_write_issue_context_with_pr(tmp_path, base_config):
+    ws = Path(base_config["pipeline"]["workspace_base"]) / "issue-8"
+    ws.mkdir(parents=True)
+    d.write_issue_context(base_config, 8, "# Issue #8", "---\n# Pull Request #3")
+    content = (ws / "ISSUE.md").read_text()
+    assert "# Issue #8" in content
+    assert "# Pull Request #3" in content
+
+
+def test_write_issue_context_without_pr(tmp_path, base_config):
+    ws = Path(base_config["pipeline"]["workspace_base"]) / "issue-9"
+    ws.mkdir(parents=True)
+    d.write_issue_context(base_config, 9, "# Issue #9", None)
+    content = (ws / "ISSUE.md").read_text()
+    assert content == "# Issue #9"
+
+
+
 
 def test_notify_discord(base_config):
     base_config["notifications"] = {"discord": {"webhook_url": "https://discord.example/hook"}}

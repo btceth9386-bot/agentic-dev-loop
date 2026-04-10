@@ -152,6 +152,49 @@ def fetch_issue_context(issue_number, repo_path):
     return "\n".join(lines)
 
 
+def fetch_pr_context(issue_number, repo_path):
+    """Return formatted PR markdown string, or None if no PR exists for agent/issue-<N>."""
+    import json
+    result = _gh(
+        ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number,url,title", "--limit", "1"],
+        repo_path,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    prs = json.loads(result.stdout)
+    if not prs:
+        return None
+    pr = prs[0]
+    detail = _gh(["pr", "view", str(pr["number"]), "--json", "number,url,title,reviews,comments"], repo_path)
+    if detail.returncode != 0:
+        return None
+    d = json.loads(detail.stdout)
+    lines = [
+        "---",
+        f"# Pull Request #{d['number']}",
+        "## URL",
+        d.get("url", ""),
+        "## Title",
+        d.get("title", ""),
+        "## Review Comments",
+    ]
+    for review in d.get("reviews", []):
+        author = review.get("author", {}).get("login", "unknown")
+        body = review.get("body", "").strip()
+        if body:
+            lines += [f"### Review by {author}", "", body, ""]
+    for comment in d.get("comments", []):
+        author = comment.get("author", {}).get("login", "unknown")
+        lines += [f"### Comment by {author}", "", comment.get("body", ""), ""]
+    return "\n".join(lines)
+
+
+def post_assignment_comment(issue_number, agent_name, role, attempt, repo_path, is_retry=False):
+    label = "retry attempt" if is_retry else "attempt"
+    body = f"🤖 Assigned to **{agent_name}** ({role}) — {label} {attempt}"
+    _gh(["issue", "comment", str(issue_number), "--body", body], repo_path)
+
+
 # ---------------------------------------------------------------------------
 # Lockfile
 # ---------------------------------------------------------------------------
@@ -234,9 +277,12 @@ def cleanup_workspace(config, issue_number):
     current.unlink(missing_ok=True)
 
 
-def write_issue_context(config, issue_number, context_text):
+def write_issue_context(config, issue_number, context_text, pr_context=None):
     workspace = _workspace_path(config, issue_number)
-    (workspace / "ISSUE.md").write_text(context_text)
+    content = context_text
+    if pr_context:
+        content = content + "\n\n" + pr_context
+    (workspace / "ISSUE.md").write_text(content)
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +458,8 @@ def process_issue(config, issue, role_name, role_cfg):
     # Write ISSUE.md
     try:
         context = fetch_issue_context(issue_number, repo_path)
-        write_issue_context(config, issue_number, context)
+        pr_context = fetch_pr_context(issue_number, repo_path)
+        write_issue_context(config, issue_number, context, pr_context)
     except Exception as e:
         log.error("Failed to write ISSUE.md for #%s: %s", issue_number, e)
 
@@ -427,6 +474,7 @@ def process_issue(config, issue, role_name, role_cfg):
         return
 
     try:
+        post_assignment_comment(issue_number, agent["name"], role_name, attempt, repo_path, is_retry=(attempt > 1))
         log.info("Running agent '%s' on issue #%s", agent["name"], issue_number)
         result = run_agent(agent, workspace)
         success = result.returncode == 0
