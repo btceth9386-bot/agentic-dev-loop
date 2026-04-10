@@ -341,3 +341,44 @@ def write_state_log(config, issue_number, agent_name, role, prev_state, curr_sta
     symlink.symlink_to(log_file)
 
 
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+NOTIFY_ON = {"changes-requested", "ready-to-merge", "human-review-required", "in-progress", "pr-opened"}
+
+
+def notify(config, message, state=None):
+    if state and state not in NOTIFY_ON:
+        return
+    notif = config.get("notifications", {})
+    _notify_telegram(notif.get("telegram", {}), message)
+    _notify_discord(notif.get("discord", {}), message)
+
+
+def _notify_telegram(cfg, message):
+    token = cfg.get("token")
+    chat_id = cfg.get("chat_id")
+    if not token or not chat_id:
+        return
+    import urllib.request, urllib.parse, json as _json
+    data = urllib.parse.urlencode({"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}).encode()
+    try:
+        urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=10)
+    except Exception as e:
+        log.warning("Telegram notify failed: %s", e)
+
+
+def _notify_discord(cfg, message):
+    webhook_url = cfg.get("webhook_url")
+    if not webhook_url:
+        return
+    import urllib.request, json as _json
+    data = _json.dumps({"content": message}).encode()
+    req = urllib.request.Request(webhook_url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        log.warning("Discord notify failed: %s", e)
+
+
