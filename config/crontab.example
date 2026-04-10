@@ -1,0 +1,8 @@
+# Agentic Loop crontab setup
+# Edit with: crontab -e
+
+# Run dispatcher every 3 minutes
+*/3 * * * * /usr/bin/python3 /path/to/dispatcher.py >> /tmp/agentic-loop.log 2>> /tmp/agentic-loop.error.log
+
+# Run auto-merge every 3 minutes (offset by 90s to avoid overlap with dispatcher)
+*/3 * * * * sleep 90 && /bin/bash /path/to/merge.sh >> /tmp/agentic-loop-merge.log 2>&1

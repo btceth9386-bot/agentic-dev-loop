@@ -1,0 +1,41 @@
+pipeline:
+  repo_path: "/path/to/your/repo"
+  workspace_base: "~/.agent-pipeline/your-repo-name/workspaces"
+  state_base: "~/.agent-pipeline/your-repo-name/state"
+
+agents:
+  # Add --resume flags to command if the CLI supports session resume
+  - name: kiro-cli
+    role: coding
+    command: "kiro-cli --resume --agent senior --no-interactive"
+    max_concurrent: 2
+    cooldown_minutes: 0
+
+  - name: claude
+    role: review
+    command: "claude --dangerously-skip-permissions -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md then begin.'"
+    max_concurrent: 1
+    cooldown_minutes: 0
+
+  - name: codex
+    role: coding
+    command: "codex --no-interactive"
+    max_concurrent: 1
+    cooldown_minutes: 0
+
+roles:
+  coding:
+    pickup_label: "todo"
+    label_on_start: "in-progress"
+    label_on_done: "pr-opened"
+  review:
+    pickup_label: "pr-opened"
+    label_on_start: "reviewing"
+    label_on_done: "ready-to-merge"
+
+notifications:
+  telegram:
+    token: "${TELEGRAM_BOT_TOKEN}"
+    chat_id: "${TELEGRAM_CHAT_ID}"
+  discord:
+    webhook_url: "${DISCORD_WEBHOOK_URL}"
