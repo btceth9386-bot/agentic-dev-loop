@@ -165,6 +165,16 @@ def fetch_issue_context(repo_path: str, issue_number: int) -> str:
     Run `gh issue view <number> --json title,body,comments` from repo_path.
     Returns formatted markdown string for ISSUE.md.
     """
+
+def post_assignment_comment(repo_path: str, issue_number: int, agent_name: str, role: str, attempt: int, is_retry: bool = False) -> None:
+    """
+    Post a comment on the GitHub issue indicating which agent was assigned.
+    Runs `gh issue comment <number> --body "<message>"` from repo_path.
+
+    Format:
+      - Normal:  🤖 Assigned to **<agent_name>** (<role>) — attempt <N>
+      - Retry:   🤖 Assigned to **<agent_name>** (<role>) — retry attempt <N>
+    """
 ```
 
 #### 3. Workspace Module
@@ -310,6 +320,7 @@ def main():
           - Create/reuse workspace
           - Write ISSUE.md
           - Pick agent (round-robin)
+          - Post assignment comment on GitHub issue
           - Acquire lockfile
           - Run agent subprocess
           - Process result (transition label, handle retries)
@@ -317,7 +328,7 @@ def main():
           - Update current/ symlink
           - Send notifications
           - Release lockfile
-    4. Handle changes-requested issues (retry loop)
+    4. Handle changes-requested issues (retry loop, with retry assignment comment)
     5. Clean up stale lockfiles
     """
 ```
@@ -524,6 +535,7 @@ for each role in config.roles:
         agent = pick_agent(config.agents, role)
         if agent is None:
             continue  # no agent available, will retry next cycle
+        post_assignment_comment(repo_path, issue.number, agent.name, role, attempt=1)
         acquire_lock(agent.name, issue.number)
         exit_code, stdout, stderr = run_agent(agent, workspace)
         process_result(issue, agent, role, exit_code, stdout, stderr)
@@ -569,6 +581,18 @@ def process_result(issue, agent, role, exit_code, stdout, stderr):
                     transition_label(issue, "changes-requested", "human-review-required")
                     cleanup_workspace(issue.number)
                     notify("Issue #{issue.number} escalated to human review")
+```
+
+#### Change-Request Retry Comment
+
+When the Dispatcher picks up a `changes-requested` issue for retry, it posts a retry assignment comment before spawning the agent:
+
+```
+agent = pick_agent(config.agents, "coding")
+post_assignment_comment(repo_path, issue.number, agent.name, "coding", attempt, is_retry=True)
+acquire_lock(agent.name, issue.number)
+run_agent(agent, workspace)
+```
 ```
 
 #### Workspace Cleanup Triggers

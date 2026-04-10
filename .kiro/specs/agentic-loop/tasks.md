@@ -55,10 +55,18 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Format output as markdown with issue number prominently included
     - _Requirements: 6.1, 6.3_
 
-  - [ ]* 3.4 Write unit tests for GitHub interaction module
+  - [ ] 3.4 Implement `post_assignment_comment()` — post agent assignment comment on GitHub issue
+    - Run `gh issue comment <number> --body "<message>"` from `repo_path`
+    - Format: `🤖 Assigned to **<agent_name>** (<role>) — attempt <N>` for normal assignments
+    - Format: `🤖 Assigned to **<agent_name>** (<role>) — retry attempt <N>` for retry assignments
+    - Accept `is_retry` flag to select the appropriate format
+    - _Requirements: 7.6, 8.6, 9.6_
+
+  - [ ]* 3.5 Write unit tests for GitHub interaction module
     - Mock `subprocess.run` calls to `gh` CLI
     - Test poll filtering, label transition command construction, context formatting
-    - _Requirements: 1.1, 1.2, 1.5, 1.6, 2.3, 6.1, 6.3_
+    - Test `post_assignment_comment()` command construction for normal and retry formats
+    - _Requirements: 1.1, 1.2, 1.5, 1.6, 2.3, 6.1, 6.3, 7.6, 8.6, 9.6_
 
 - [ ] 4. Implement lockfile module
   - [ ] 4.1 Implement `acquire_lock()`, `release_lock()`, `get_active_locks()`, `count_active_locks()`
@@ -149,8 +157,8 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Load and validate config (reload every cycle)
     - Validate .gitignore
     - For each role: poll issues, calculate capacity, pick up issues up to capacity
-    - For each picked-up issue: transition label, create/reuse workspace, write ISSUE.md, pick agent, acquire lock, run agent, process result, write state log, update symlink, notify, release lock
-    - _Requirements: 1.1, 1.4, 1.5, 1.7, 1.8, 3.3_
+    - For each picked-up issue: transition label, create/reuse workspace, write ISSUE.md, pick agent, post assignment comment via `post_assignment_comment()`, acquire lock, run agent, process result, write state log, update symlink, notify, release lock
+    - _Requirements: 1.1, 1.4, 1.5, 1.7, 1.8, 3.3, 7.6, 8.6_
 
   - [ ] 11.2 Implement result processing — coding and review outcome handling
     - Coding agent exit 0 → transition `in-progress` to `pr-opened`
@@ -161,9 +169,10 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
 
   - [ ] 11.3 Implement change-request retry loop
     - Handle `changes-requested` issues: spawn coding agent using `command` in same worktree
+    - Post retry assignment comment via `post_assignment_comment()` with `is_retry=True` before spawning agent
     - On success, transition back to `pr-opened` for re-review
     - On attempt >= 3, transition to `human-review-required`, clean up workspace, notify
-    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
   - [ ] 11.4 Wire runtime logging to `/tmp/agentic-loop.log` and `/tmp/agentic-loop.error.log`
     - Configure Python logging for stdout/stderr file output
@@ -171,9 +180,9 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
 
   - [ ]* 11.5 Write integration tests for the main orchestration loop
     - Mock GitHub CLI and subprocess calls end-to-end
-    - Test full poll cycle: issue pickup → agent execution → label transition → state log
-    - Test retry loop and human-review escalation
-    - _Requirements: 1.1–1.8, 7.1–7.4, 8.1–8.5, 9.1–9.5_
+    - Test full poll cycle: issue pickup → assignment comment → agent execution → label transition → state log
+    - Test retry loop with retry assignment comment and human-review escalation
+    - _Requirements: 1.1–1.8, 7.1–7.4, 7.6, 8.1–8.6, 9.1–9.6_
 
 - [ ] 12. Checkpoint — Ensure orchestration tests pass
   - Ensure all tests pass, ask the user if questions arise.

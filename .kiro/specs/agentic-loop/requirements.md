@@ -124,6 +124,7 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 3. IF the Coding_Agent subprocess exits with a non-zero code, THEN THE Dispatcher SHALL log the failure in the State_Log and send a notification.
 4. THE Dispatcher SHALL capture stdout and stderr from the Coding_Agent subprocess using `capture_output=True`.
 5. THE Coding_Agent SHALL include a closing keyword referencing the issue number in the pull request title using the format `Fix #<issue_number>: <description>`, so that merging the PR into the default branch automatically closes the linked GitHub issue.
+6. WHEN the Dispatcher assigns a Coding_Agent to an issue, THE Dispatcher SHALL post a comment on the GitHub issue containing the agent name, role, and attempt number using the format `🤖 Assigned to **<agent_name>** (<role>) — attempt <N>`.
 
 ### Requirement 8: Review Agent Execution
 
@@ -136,6 +137,7 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 3. WHEN the Review_Agent approves the PR, THE Dispatcher SHALL transition the issue label from `reviewing` to `ready-to-merge`.
 4. WHEN the Review_Agent requests changes, THE Dispatcher SHALL transition the issue label from `reviewing` to `changes-requested`.
 5. THE Dispatcher SHALL capture stdout and stderr from the Review_Agent subprocess using `capture_output=True`.
+6. WHEN the Dispatcher assigns a Review_Agent to an issue, THE Dispatcher SHALL post a comment on the GitHub issue containing the agent name, role, and attempt number using the format `🤖 Assigned to **<agent_name>** (<role>) — attempt <N>`.
 
 ### Requirement 9: Change Request Handling and Retry Loop
 
@@ -148,6 +150,7 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 3. THE Dispatcher SHALL derive the review attempt count for an issue by counting files matching the pattern `*-changes-requested.log` in the issue's state directory (`~/.agent-pipeline/<repo>/state/issue-<number>/`).
 4. WHEN the number of `*-changes-requested.log` files in the issue's state directory reaches 3 without approval, THE Dispatcher SHALL transition the issue label to `human-review-required`.
 5. WHEN an issue is labeled `human-review-required`, THE Dispatcher SHALL send a notification and clean up the workspace.
+6. WHEN the Dispatcher assigns a Coding_Agent for a retry on a `changes-requested` issue, THE Dispatcher SHALL post a comment on the GitHub issue containing the agent name, role, and retry attempt number using the format `🤖 Assigned to **<agent_name>** (<role>) — retry attempt <N>`.
 
 ### Requirement 10: Lockfile-Based Concurrency Control
 
