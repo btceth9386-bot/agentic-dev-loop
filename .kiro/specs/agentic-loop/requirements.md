@@ -16,7 +16,8 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 - **Lockfile**: A file under `/tmp/` used to track concurrent assignments per agent, supporting multiple locks up to the agent's `max_concurrent` limit.
 - **Role_Capacity**: The number of issues the Dispatcher can pick up for a given role in a single poll cycle, calculated by summing `max_concurrent` across all agents with that role and subtracting currently occupied slots.
 - **Pickup_Label**: A per-role field in the Agents_Config that specifies which GitHub label the Dispatcher should look for when polling issues for that role. For example, the `coding` role uses `todo` as its Pickup_Label, and the `review` role uses `pr-opened`.
-- **Agents_Config**: The `agents.yml` configuration file defining agent names, roles, commands, concurrency limits, and cooldown settings. Each role definition includes a `pickup_label` field (the label the Dispatcher polls for), `label_on_start`, and `label_on_done`. Each agent's `command` field contains the complete CLI invocation including the AI agent's prompt/role assignment and any resume flags the user wants (e.g., `kiro-cli --resume --agent senior --no-interactive`). The Dispatcher runs the same `command` for both initial runs and retries, without constructing or modifying the invocation.
+- **Agents_Config**: The `agents.yml` configuration file defining agent names, roles, commands, concurrency limits, and cooldown settings. Each role definition includes a `pickup_label` field (the label the Dispatcher polls for), `label_on_start`, and `label_on_done`. Each agent's `command` field contains the complete CLI invocation including the AI agent's prompt/role assignment and any resume flags the user wants (e.g., `kiro-cli --resume --agent senior --no-interactive`). The Dispatcher runs the same `command` for both initial runs and retries, without constructing or modifying the invocation. All string values in the file support `${VAR_NAME}` environment variable expansion at load time.
+- **Env_Var_Expansion**: The mechanism by which the Dispatcher substitutes `${VAR_NAME}` patterns in Agents_Config string values with the corresponding environment variable value from `os.environ` at config load time. Uses the regex pattern `\$\{[A-Za-z_][A-Za-z0-9_]*\}`.
 - **Auto_Merge_Cronjob**: A separate shell script (`merge.sh`) that merges pull requests labeled `ready-to-merge`.
 - **Notification_System**: The subsystem that sends messages via Telegram or Discord at key state transitions.
 - **Issue_Context**: The `ISSUE.md` file written into a worktree containing the GitHub issue title, body, and comments.
@@ -65,10 +66,13 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 7. IF a required field is missing from an agent entry in the Agents_Config file, THEN THE Dispatcher SHALL fail immediately with a descriptive error message identifying the agent entry and the missing field.
 8. IF a required field is missing from a role definition in the Agents_Config file, THEN THE Dispatcher SHALL fail immediately with a descriptive error message identifying the role and the missing field.
 9. IF the Agents_Config file contains invalid YAML syntax, THEN THE Dispatcher SHALL fail immediately with a descriptive parse error message.
-10. WHEN the Dispatcher starts, THE Dispatcher SHALL verify that a `.gitignore` file exists at the configured `repo_path`.
-11. IF the `.gitignore` file is missing at `repo_path`, THEN THE Dispatcher SHALL fail immediately with a descriptive error message stating that a `.gitignore` file is required.
-12. WHEN the Dispatcher starts, THE Dispatcher SHALL validate that the `.gitignore` file contains entries for all Required_Gitignore_Entries: `ISSUE.md`, `.kiro/`, `.claude/`, `.codex/`, `.copilot/`, and `.gemini/`.
-13. IF the `.gitignore` file is missing one or more Required_Gitignore_Entries, THEN THE Dispatcher SHALL fail immediately with a descriptive error message listing the missing entries.
+10. WHEN the Dispatcher loads the Agents_Config file, THE Dispatcher SHALL expand all `${VAR_NAME}` patterns in YAML string values by substituting the value of the corresponding environment variable from `os.environ`.
+11. THE Dispatcher SHALL match environment variable references using the pattern `\$\{[A-Za-z_][A-Za-z0-9_]*\}` and SHALL leave strings without matching patterns unchanged.
+12. IF a `${VAR_NAME}` pattern references an environment variable that is not set, THEN THE Dispatcher SHALL fail immediately with a descriptive error message identifying the undefined variable name and the config key where it was referenced.
+13. WHEN the Dispatcher starts, THE Dispatcher SHALL verify that a `.gitignore` file exists at the configured `repo_path`.
+14. IF the `.gitignore` file is missing at `repo_path`, THEN THE Dispatcher SHALL fail immediately with a descriptive error message stating that a `.gitignore` file is required.
+15. WHEN the Dispatcher starts, THE Dispatcher SHALL validate that the `.gitignore` file contains entries for all Required_Gitignore_Entries: `ISSUE.md`, `.kiro/`, `.claude/`, `.codex/`, `.copilot/`, and `.gemini/`.
+16. IF the `.gitignore` file is missing one or more Required_Gitignore_Entries, THEN THE Dispatcher SHALL fail immediately with a descriptive error message listing the missing entries.
 
 ### Requirement 4: Agent Selection and Rotation
 

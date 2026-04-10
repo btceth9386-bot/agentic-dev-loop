@@ -120,6 +120,10 @@ def load_config(config_path: str) -> dict:
     """
     Load and validate agents.yml.
     - Parses YAML
+    - Expands ${VAR_NAME} patterns in all string values using os.environ
+      (regex: r'\$\{[A-Za-z_][A-Za-z0-9_]*\}')
+      Raises descriptive error if a referenced env var is not set.
+      Strings without ${...} patterns are left unchanged.
     - Validates required agent fields: name, role, command, max_concurrent
     - Validates optional agent fields: cooldown_minutes
     - Validates required role fields: pickup_label, label_on_start, label_on_done
@@ -360,12 +364,12 @@ roles:
     label_on_start: str   # Label applied when agent begins work
     label_on_done: str    # Label(s) applied on completion (comma-separated for review)
 
-notifications:            # Optional section
+notifications:            # Optional section — supports ${VAR_NAME} env var expansion
   telegram:
-    token: str            # Telegram Bot API token
-    chat_id: str          # Telegram chat ID
+    token: "${TELEGRAM_BOT_TOKEN}"       # Expanded from env var at load time
+    chat_id: "${TELEGRAM_CHAT_ID}"       # Expanded from env var at load time
   discord:
-    webhook_url: str      # Discord webhook URL
+    webhook_url: "${DISCORD_WEBHOOK_URL}" # Expanded from env var at load time
 ```
 
 ### Label State Machine Transitions
