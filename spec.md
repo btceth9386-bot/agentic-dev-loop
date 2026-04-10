@@ -220,7 +220,7 @@ A plain folder cannot run `git commit`, `git push`, or `gh pr create` — agent 
 # Dispatcher runs this from repo_path
 cd /path/to/your/repo
 git worktree add -b agent/issue-42 \
-  ~/.agent-pipeline/your-repo-name/workspaces/issue-42 main
+  ~/.agent-pipeline/your-repo-name/workspaces/issue-42 origin/main
 ```
 
 The resulting `~/.agent-pipeline/.../issue-42/` is a normal directory. Its `.git` is a pointer file (not a folder) pointing back to the main repo's `.git`. Agent CLI runs from this directory as its cwd — identical to a developer `cd`-ing into the repo root.

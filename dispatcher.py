@@ -252,7 +252,7 @@ def create_workspace(config, issue_number):
         return workspace
     workspace.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        ["git", "worktree", "add", "-b", f"agent/issue-{issue_number}", str(workspace), "main"],
+        ["git", "worktree", "add", "-b", f"agent/issue-{issue_number}", str(workspace), "origin/main"],
         cwd=config["pipeline"]["repo_path"],
         capture_output=True,
         text=True,

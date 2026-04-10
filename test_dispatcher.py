@@ -270,6 +270,7 @@ def test_create_workspace_calls_git_worktree(tmp_path, base_config):
     cmd = mock.call_args[0][0]
     assert "worktree" in cmd and "add" in cmd
     assert "agent/issue-10" in cmd
+    assert "origin/main" in cmd
 
 
 def test_write_issue_context(tmp_path, base_config):
