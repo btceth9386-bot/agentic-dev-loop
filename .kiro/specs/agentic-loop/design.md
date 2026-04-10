@@ -80,7 +80,8 @@ Cron ──> dispatcher.py
               ├── remove pickup_label, apply label_on_start ──> GitHub
               ├── git worktree add (if needed) ──> Filesystem
               ├── gh issue view → ISSUE.md ──> GitHub
-              ├── write ISSUE.md to worktree ──> Filesystem
+              ├── gh pr list/view → PR context (if exists) ──> GitHub
+              ├── write ISSUE.md to worktree (overwrite) ──> Filesystem
               ├── create lockfile ──> Filesystem
               ├── subprocess.run(command, cwd=worktree) ──> Agent CLI
               │                                                 |
@@ -175,6 +176,26 @@ def post_assignment_comment(repo_path: str, issue_number: int, agent_name: str, 
       - Normal:  🤖 Assigned to **<agent_name>** (<role>) — attempt <N>
       - Retry:   🤖 Assigned to **<agent_name>** (<role>) — retry attempt <N>
     """
+
+def fetch_pr_context(repo_path: str, issue_number: int) -> str | None:
+    """
+    Check if a PR exists for the issue's branch and fetch its details.
+    1. Run `gh pr list --head agent/issue-<number> --json number,url,title --limit 1`
+       from repo_path to find a PR for the branch.
+    2. If no PR exists, return None.
+    3. If a PR exists, run `gh pr view <pr_number> --json number,url,title,reviews,comments`
+       from repo_path to fetch full details including review comments.
+    4. Format the result as a markdown string suitable for appending to ISSUE.md:
+       ---
+       # Pull Request #<number>
+       ## URL
+       <url>
+       ## Title
+       <title>
+       ## Review Comments
+       <formatted review comments with author and body>
+    Returns formatted markdown string or None if no PR exists.
+    """
 ```
 
 #### 3. Workspace Module
@@ -193,9 +214,12 @@ def cleanup_workspace(repo_path: str, workspace_base: str, issue_number: int) ->
     State logs are preserved.
     """
 
-def write_issue_context(workspace_path: str, context: str) -> None:
+def write_issue_context(workspace_path: str, context: str, pr_context: str | None = None) -> None:
     """
     Write ISSUE.md to the worktree root with issue number, title, body, comments.
+    If pr_context is provided (not None), append it after the issue details
+    separated by a horizontal rule.
+    Always overwrites the existing ISSUE.md to ensure latest content.
     """
 ```
 
@@ -318,7 +342,8 @@ def main():
        c. For each issue up to capacity:
           - Transition label (pickup → label_on_start)
           - Create/reuse workspace
-          - Write ISSUE.md
+          - Fetch PR context via fetch_pr_context() (returns None if no PR)
+          - Write ISSUE.md (overwrite) with issue context + PR context
           - Pick agent (round-robin)
           - Post assignment comment on GitHub issue
           - Acquire lockfile
@@ -329,6 +354,7 @@ def main():
           - Send notifications
           - Release lockfile
     4. Handle changes-requested issues (retry loop, with retry assignment comment)
+       - Before spawning retry coding agent: fetch PR context, re-write ISSUE.md
     5. Clean up stale lockfiles
     """
 ```
@@ -531,7 +557,9 @@ for each role in config.roles:
     for issue in to_process:
         transition_label(issue, role.pickup_label, role.label_on_start)
         workspace = create_workspace(issue.number)
-        write_issue_context(workspace, issue)
+        context = fetch_issue_context(repo_path, issue.number)
+        pr_context = fetch_pr_context(repo_path, issue.number)
+        write_issue_context(workspace, context, pr_context)
         agent = pick_agent(config.agents, role)
         if agent is None:
             continue  # no agent available, will retry next cycle
@@ -585,10 +613,13 @@ def process_result(issue, agent, role, exit_code, stdout, stderr):
 
 #### Change-Request Retry Comment
 
-When the Dispatcher picks up a `changes-requested` issue for retry, it posts a retry assignment comment before spawning the agent:
+When the Dispatcher picks up a `changes-requested` issue for retry, it re-writes ISSUE.md with the latest PR context (including review comments) and posts a retry assignment comment before spawning the agent:
 
 ```
 agent = pick_agent(config.agents, "coding")
+context = fetch_issue_context(repo_path, issue.number)
+pr_context = fetch_pr_context(repo_path, issue.number)
+write_issue_context(workspace, context, pr_context)
 post_assignment_comment(repo_path, issue.number, agent.name, "coding", attempt, is_retry=True)
 acquire_lock(agent.name, issue.number)
 run_agent(agent, workspace)

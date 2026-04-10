@@ -62,11 +62,19 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Accept `is_retry` flag to select the appropriate format
     - _Requirements: 7.6, 8.6, 9.6_
 
-  - [ ]* 3.5 Write unit tests for GitHub interaction module
+  - [ ] 3.5 Implement `fetch_pr_context()` — fetch PR details for ISSUE.md enrichment
+    - Run `gh pr list --head agent/issue-<number> --json number,url,title --limit 1` from `repo_path` to check if a PR exists for the issue's branch
+    - If no PR exists, return `None`
+    - If a PR exists, run `gh pr view <pr_number> --json number,url,title,reviews,comments` from `repo_path`
+    - Format output as markdown: PR number, URL, title, and review comments (with author and body)
+    - _Requirements: 6.4, 6.6_
+
+  - [ ]* 3.6 Write unit tests for GitHub interaction module
     - Mock `subprocess.run` calls to `gh` CLI
     - Test poll filtering, label transition command construction, context formatting
     - Test `post_assignment_comment()` command construction for normal and retry formats
-    - _Requirements: 1.1, 1.2, 1.5, 1.6, 2.3, 6.1, 6.3, 7.6, 8.6, 9.6_
+    - Test `fetch_pr_context()`: PR exists (returns formatted markdown), no PR exists (returns None), PR with review comments
+    - _Requirements: 1.1, 1.2, 1.5, 1.6, 2.3, 6.1, 6.3, 6.4, 6.6, 7.6, 8.6, 9.6_
 
 - [ ] 4. Implement lockfile module
   - [ ] 4.1 Implement `acquire_lock()`, `release_lock()`, `get_active_locks()`, `count_active_locks()`
@@ -92,11 +100,15 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
 
   - [ ] 5.3 Implement `write_issue_context()` — write ISSUE.md to worktree
     - Write formatted issue context (title, body, comments, issue number) to `ISSUE.md` in worktree root
-    - _Requirements: 6.1, 6.2, 6.3_
+    - Accept optional `pr_context` parameter; if provided, append PR details (number, URL, title, review comments) after a horizontal rule separator
+    - Always overwrite existing `ISSUE.md` to ensure latest content
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
   - [ ]* 5.4 Write unit tests for workspace module
     - Mock git subprocess calls; test create, reuse, cleanup, ISSUE.md writing
-    - _Requirements: 5.1–5.6, 6.1–6.3_
+    - Test `write_issue_context()` with and without PR context
+    - Test that ISSUE.md is overwritten (not appended) on repeated calls
+    - _Requirements: 5.1–5.6, 6.1–6.6_
 
 - [ ] 6. Checkpoint — Ensure all module tests pass
   - Ensure all tests pass, ask the user if questions arise.
@@ -157,8 +169,8 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Load and validate config (reload every cycle)
     - Validate .gitignore
     - For each role: poll issues, calculate capacity, pick up issues up to capacity
-    - For each picked-up issue: transition label, create/reuse workspace, write ISSUE.md, pick agent, post assignment comment via `post_assignment_comment()`, acquire lock, run agent, process result, write state log, update symlink, notify, release lock
-    - _Requirements: 1.1, 1.4, 1.5, 1.7, 1.8, 3.3, 7.6, 8.6_
+    - For each picked-up issue: transition label, create/reuse workspace, fetch PR context via `fetch_pr_context()`, write ISSUE.md (overwrite with issue + PR context), pick agent, post assignment comment via `post_assignment_comment()`, acquire lock, run agent, process result, write state log, update symlink, notify, release lock
+    - _Requirements: 1.1, 1.4, 1.5, 1.7, 1.8, 3.3, 6.4, 6.5, 7.6, 8.6_
 
   - [ ] 11.2 Implement result processing — coding and review outcome handling
     - Coding agent exit 0 → transition `in-progress` to `pr-opened`
@@ -168,11 +180,11 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - _Requirements: 7.2, 7.3, 8.2, 8.3, 8.4_
 
   - [ ] 11.3 Implement change-request retry loop
-    - Handle `changes-requested` issues: spawn coding agent using `command` in same worktree
+    - Handle `changes-requested` issues: fetch PR context via `fetch_pr_context()`, re-write ISSUE.md with latest issue + PR context (including review comments), spawn coding agent using `command` in same worktree
     - Post retry assignment comment via `post_assignment_comment()` with `is_retry=True` before spawning agent
     - On success, transition back to `pr-opened` for re-review
     - On attempt >= 3, transition to `human-review-required`, clean up workspace, notify
-    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 6.4, 6.5_
 
   - [ ] 11.4 Wire runtime logging to `/tmp/agentic-loop.log` and `/tmp/agentic-loop.error.log`
     - Configure Python logging for stdout/stderr file output
@@ -182,7 +194,9 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Mock GitHub CLI and subprocess calls end-to-end
     - Test full poll cycle: issue pickup → assignment comment → agent execution → label transition → state log
     - Test retry loop with retry assignment comment and human-review escalation
-    - _Requirements: 1.1–1.8, 7.1–7.4, 7.6, 8.1–8.6, 9.1–9.6_
+    - Test that ISSUE.md is re-written with PR context before review and retry agent invocations
+    - Test ISSUE.md without PR context when no PR exists for the branch
+    - _Requirements: 1.1–1.8, 6.4–6.6, 7.1–7.4, 7.6, 8.1–8.6, 9.1–9.6_
 
 - [ ] 12. Checkpoint — Ensure orchestration tests pass
   - Ensure all tests pass, ask the user if questions arise.

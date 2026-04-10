@@ -20,7 +20,8 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 - **Env_Var_Expansion**: The mechanism by which the Dispatcher substitutes `${VAR_NAME}` patterns in Agents_Config string values with the corresponding environment variable value from `os.environ` at config load time. Uses the regex pattern `\$\{[A-Za-z_][A-Za-z0-9_]*\}`.
 - **Auto_Merge_Cronjob**: A separate shell script (`merge.sh`) that merges pull requests labeled `ready-to-merge`.
 - **Notification_System**: The subsystem that sends messages via Telegram or Discord at key state transitions.
-- **Issue_Context**: The `ISSUE.md` file written into a worktree containing the GitHub issue title, body, and comments.
+- **Issue_Context**: The `ISSUE.md` file written into a worktree containing the GitHub issue title, body, and comments, and optionally the associated PR details (number, URL, title, review comments) when a PR exists for the issue's branch.
+- **PR_Context**: The pull request details (number, URL, title, review comments) fetched via the GitHub CLI for the branch `agent/issue-<number>`. Included in `ISSUE.md` when a PR exists.
 - **Required_Gitignore_Entries**: The set of `.gitignore` patterns that must be present in the repository to prevent agents from committing dispatcher-injected files (`ISSUE.md`) and agent CLI session directories (`.kiro/`, `.claude/`, `.codex/`, `.copilot/`, `.gemini/`).
 
 ## Requirements
@@ -112,6 +113,9 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 1. WHEN a workspace is prepared for an agent, THE Dispatcher SHALL write the issue title, body, and comments to an `ISSUE.md` file in the worktree root using the GitHub CLI.
 2. THE Dispatcher SHALL write the Issue_Context before executing the agent CLI subprocess.
 3. THE Dispatcher SHALL include the issue number prominently in the `ISSUE.md` file so that the Coding_Agent can reference it when creating a pull request title with a closing keyword (e.g., `Fix #<issue_number>: <description>`).
+4. WHEN a pull request exists for the issue's branch (`agent/issue-<number>`), THE Dispatcher SHALL fetch PR details (number, URL, title, and review comments) via the GitHub CLI and include them in the `ISSUE.md` file.
+5. THE Dispatcher SHALL re-write `ISSUE.md` (overwrite) before each agent invocation to ensure the file contains the latest issue details and PR_Context.
+6. WHEN no pull request exists for the issue's branch, THE Dispatcher SHALL write `ISSUE.md` containing only the issue details without a PR section.
 
 ### Requirement 7: Coding Agent Execution
 
