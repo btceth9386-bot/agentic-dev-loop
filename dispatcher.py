@@ -150,3 +150,45 @@ def fetch_issue_context(issue_number, repo_path):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Lockfile
+# ---------------------------------------------------------------------------
+
+LOCK_DIR = Path("/tmp")
+STALE_SECONDS = 30 * 60
+
+
+def _lock_path(agent_name, issue_number):
+    return LOCK_DIR / f"agent-{agent_name}-{issue_number}.lock"
+
+
+def acquire_lock(agent_name, issue_number):
+    path = _lock_path(agent_name, issue_number)
+    if path.exists():
+        return False
+    path.write_text(f"{int(time.time())}:{issue_number}")
+    return True
+
+
+def release_lock(agent_name, issue_number):
+    _lock_path(agent_name, issue_number).unlink(missing_ok=True)
+
+
+def get_active_locks(agent_name):
+    locks = []
+    for p in LOCK_DIR.glob(f"agent-{agent_name}-*.lock"):
+        try:
+            ts, issue = p.read_text().split(":")
+            if time.time() - int(ts) < STALE_SECONDS:
+                locks.append(p)
+            else:
+                p.unlink(missing_ok=True)  # stale
+        except Exception:
+            p.unlink(missing_ok=True)
+    return locks
+
+
+def count_active_locks(agent_name):
+    return len(get_active_locks(agent_name))
+
+
