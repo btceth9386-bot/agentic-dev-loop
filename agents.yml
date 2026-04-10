@@ -7,19 +7,19 @@ agents:
   # Add --resume flags to command if the CLI supports session resume
   - name: kiro-cli
     role: coding
-    command: "kiro-cli --resume --agent senior --no-interactive"
+    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md first then begin'"
     max_concurrent: 2
     cooldown_minutes: 0
 
   - name: claude
     role: review
-    command: "claude --dangerously-skip-permissions -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md then begin.'"
+    command: "claude --dangerously-skip-permissions --agent architect -p 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
     cooldown_minutes: 0
 
   - name: codex
-    role: coding
-    command: "codex --no-interactive"
+    role: review
+    command: "codex exec --yolo --skip-git-repo-check --model gpt-5.4 resume --last 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
     cooldown_minutes: 0
 
