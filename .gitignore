@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Pytest
+.pytest_cache/
+
+# Agent workspaces (injected per-issue, not part of repo)
+ISSUE.md
+
+# Agent session dirs
+.kiro/
+.claude/
+.codex/
+.copilot/
+.gemini/
