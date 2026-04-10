@@ -16,3 +16,6 @@ ISSUE.md
 .codex/
 .copilot/
 .gemini/
+
+#config
+agents.yml
