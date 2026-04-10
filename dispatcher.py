@@ -237,3 +237,57 @@ def write_issue_context(config, issue_number, context_text):
     (workspace / "ISSUE.md").write_text(context_text)
 
 
+# ---------------------------------------------------------------------------
+# Agent selection & execution
+# ---------------------------------------------------------------------------
+
+# Simple round-robin counter per role
+_rr_index: dict[str, int] = {}
+
+
+def calculate_role_capacity(config, role):
+    agents = [a for a in config["agents"] if a["role"] == role]
+    total = sum(a["max_concurrent"] for a in agents)
+    used = sum(count_active_locks(a["name"]) for a in agents)
+    return max(0, total - used)
+
+
+def _in_cooldown(agent):
+    cooldown = agent.get("cooldown_minutes", 0)
+    if not cooldown:
+        return False
+    marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
+    if not marker.exists():
+        return False
+    elapsed = (time.time() - marker.stat().st_mtime) / 60
+    if elapsed >= cooldown:
+        marker.unlink(missing_ok=True)
+        return False
+    return True
+
+
+def pick_agent(config, role):
+    candidates = [
+        a for a in config["agents"]
+        if a["role"] == role
+        and count_active_locks(a["name"]) < a["max_concurrent"]
+        and not _in_cooldown(a)
+    ]
+    if not candidates:
+        return None
+    idx = _rr_index.get(role, 0) % len(candidates)
+    _rr_index[role] = idx + 1
+    return candidates[idx]
+
+
+def run_agent(agent, workspace_path):
+    import shlex
+    result = subprocess.run(
+        shlex.split(agent["command"]),
+        cwd=str(workspace_path),
+        capture_output=True,
+        text=True,
+    )
+    return result
+
+
