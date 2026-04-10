@@ -23,17 +23,19 @@ Implement the agentic-loop pipeline as three artifacts: `dispatcher.py` (Python 
     - Raise descriptive errors on missing fields or invalid YAML syntax
     - _Requirements: 3.1, 3.2, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12_
 
-  - [ ] 1.3 Implement `validate_gitignore()` — .gitignore presence and entry checks
+  - [ ] 1.3 Implement `validate_gitignore()` — .gitignore presence, entry checks, and AGENTS.md warning
     - Verify `.gitignore` exists at `repo_path`
     - Validate it contains all Required_Gitignore_Entries: `ISSUE.md`, `.kiro/`, `.claude/`, `.codex/`, `.copilot/`, `.gemini/`
     - Fail with descriptive error listing missing entries
-    - _Requirements: 3.13, 3.14, 3.15, 3.16_
+    - Check if `AGENTS.md` exists at `repo_path`; if missing, log a warning "⚠️ AGENTS.md not found in repo_path — agent CLIs may lack project context." and continue (do not fail)
+    - _Requirements: 3.13, 3.14, 3.15, 3.16, 3.17, 3.18_
 
   - [ ]* 1.4 Write unit tests for `load_config()` and `validate_gitignore()`
     - Test valid config loading, missing agent fields, missing role fields, invalid YAML
     - Test `${VAR_NAME}` expansion: env var set → value substituted, env var not set → descriptive error raised, strings without `${...}` → unchanged
     - Test .gitignore present with all entries, missing file, missing entries
-    - _Requirements: 3.1–3.16_
+    - Test AGENTS.md present (no warning), AGENTS.md missing (warning logged, no error raised)
+    - _Requirements: 3.1–3.18_
 
 - [ ] 2. Checkpoint — Ensure config module tests pass
   - Ensure all tests pass, ask the user if questions arise.

@@ -73,6 +73,8 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 14. IF the `.gitignore` file is missing at `repo_path`, THEN THE Dispatcher SHALL fail immediately with a descriptive error message stating that a `.gitignore` file is required.
 15. WHEN the Dispatcher starts, THE Dispatcher SHALL validate that the `.gitignore` file contains entries for all Required_Gitignore_Entries: `ISSUE.md`, `.kiro/`, `.claude/`, `.codex/`, `.copilot/`, and `.gemini/`.
 16. IF the `.gitignore` file is missing one or more Required_Gitignore_Entries, THEN THE Dispatcher SHALL fail immediately with a descriptive error message listing the missing entries.
+17. WHEN the Dispatcher starts, THE Dispatcher SHALL check whether an `AGENTS.md` file exists at the configured `repo_path`.
+18. IF `AGENTS.md` is missing at `repo_path`, THEN THE Dispatcher SHALL log a warning message "⚠️ AGENTS.md not found in repo_path — agent CLIs may lack project context." and continue execution without failing.
 
 ### Requirement 4: Agent Selection and Rotation
 

@@ -136,6 +136,11 @@ def validate_gitignore(repo_path: str) -> None:
     Check that .gitignore exists at repo_path and contains all
     Required_Gitignore_Entries: ISSUE.md, .kiro/, .claude/, .codex/, .copilot/, .gemini/
     Raises descriptive error if missing file or entries.
+
+    Also checks whether AGENTS.md exists at repo_path.
+    If missing, logs a warning:
+      "⚠️ AGENTS.md not found in {repo_path} — agent CLIs may lack project context."
+    This is a non-fatal check — the Dispatcher continues execution.
     """
 ```
 
