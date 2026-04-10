@@ -12,7 +12,13 @@ A local multi-agent CI/CD pipeline that autonomously handles GitHub Issues — f
 - **Human-in-the-loop** — escalates to `human-review-required` after 3 failed review cycles
 - **Notifications** — Telegram and/or Discord alerts at key state transitions
 
-## How It Works
+## Security Notice
+
+> ⚠️ **Use in non-production environments only.**
+>
+> Agent CLIs are invoked with full permissions (e.g. `--dangerously-skip-permissions`). They can read, write, and execute arbitrary code in your repository. Do not point this pipeline at production repos or systems with sensitive data.
+
+
 
 ```
 GitHub Issue (label: todo)
