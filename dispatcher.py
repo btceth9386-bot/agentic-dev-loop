@@ -85,3 +85,68 @@ def validate_gitignore(repo_path):
         log.warning("⚠️ AGENTS.md not found in repo_path — agent CLIs may lack project context.")
 
 
+# ---------------------------------------------------------------------------
+# GitHub interaction
+# ---------------------------------------------------------------------------
+
+STATE_LABELS = {
+    "todo", "in-progress", "pr-opened", "reviewing",
+    "ready-to-merge", "changes-requested", "human-review-required",
+}
+
+
+def _gh(args, repo_path, **kwargs):
+    return subprocess.run(
+        ["gh"] + args,
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        **kwargs,
+    )
+
+
+def poll_issues(label, repo_path):
+    """Return list of issues with `label` that carry no other state label."""
+    import json
+    result = _gh(["issue", "list", "--label", label, "--json", "number,title,labels", "--limit", "50"], repo_path)
+    if result.returncode != 0:
+        log.error("gh issue list failed: %s", result.stderr)
+        return []
+    issues = json.loads(result.stdout or "[]")
+    filtered = []
+    for issue in issues:
+        issue_labels = {lbl["name"] for lbl in issue.get("labels", [])}
+        other_state = issue_labels & STATE_LABELS - {label}
+        if not other_state:
+            filtered.append(issue)
+    return filtered
+
+
+def transition_label(issue_number, old_label, new_label, repo_path):
+    result = _gh(
+        ["issue", "edit", str(issue_number), "--remove-label", old_label, "--add-label", new_label],
+        repo_path,
+    )
+    if result.returncode != 0:
+        log.error("Label transition failed for #%s: %s", issue_number, result.stderr)
+        return False
+    return True
+
+
+def fetch_issue_context(issue_number, repo_path):
+    import json
+    result = _gh(["issue", "view", str(issue_number), "--json", "title,body,comments"], repo_path)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to fetch issue #{issue_number}: {result.stderr}")
+    data = json.loads(result.stdout)
+    lines = [
+        f"# Issue #{issue_number}: {data['title']}",
+        "",
+        data.get("body", ""),
+        "",
+    ]
+    for comment in data.get("comments", []):
+        lines += [f"## Comment by {comment.get('author', {}).get('login', 'unknown')}", "", comment.get("body", ""), ""]
+    return "\n".join(lines)
+
+
