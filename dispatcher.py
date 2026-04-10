@@ -382,3 +382,117 @@ def _notify_discord(cfg, message):
         log.warning("Discord notify failed: %s", e)
 
 
+# ---------------------------------------------------------------------------
+# Main orchestration loop
+# ---------------------------------------------------------------------------
+
+def process_issue(config, issue, role_name, role_cfg):
+    issue_number = issue["number"]
+    pickup_label = role_cfg["pickup_label"]
+    label_on_start = role_cfg["label_on_start"]
+    label_on_done = role_cfg["label_on_done"]
+    repo_path = config["pipeline"]["repo_path"]
+
+    log.info("Picking up issue #%s for role '%s'", issue_number, role_name)
+
+    # Transition label to in-progress/reviewing
+    if not transition_label(issue_number, pickup_label, label_on_start, repo_path):
+        return
+
+    attempt = get_attempt_count(config, issue_number) + 1
+
+    # Workspace
+    try:
+        workspace = create_workspace(config, issue_number)
+    except Exception as e:
+        log.error("Workspace creation failed for #%s: %s", issue_number, e)
+        return
+
+    # Write ISSUE.md
+    try:
+        context = fetch_issue_context(issue_number, repo_path)
+        write_issue_context(config, issue_number, context)
+    except Exception as e:
+        log.error("Failed to write ISSUE.md for #%s: %s", issue_number, e)
+
+    # Pick agent
+    agent = pick_agent(config, role_name)
+    if not agent:
+        log.warning("No available agent for role '%s', skipping #%s", role_name, issue_number)
+        return
+
+    if not acquire_lock(agent["name"], issue_number):
+        log.warning("Could not acquire lock for agent %s issue #%s", agent["name"], issue_number)
+        return
+
+    try:
+        log.info("Running agent '%s' on issue #%s", agent["name"], issue_number)
+        result = run_agent(agent, workspace)
+        success = result.returncode == 0
+
+        if role_name == "coding":
+            curr_state = label_on_done if success else "failed"
+            if success:
+                transition_label(issue_number, label_on_start, label_on_done, repo_path)
+                notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
+            else:
+                log.error("Coding agent failed for #%s", issue_number)
+                notify(config, f"❌ Coding agent failed for issue #{issue_number}", "failed")
+
+        elif role_name == "review":
+            # Determine outcome from exit code: 0=approve, 1=changes-requested
+            if success:
+                curr_state = "ready-to-merge"
+                transition_label(issue_number, label_on_start, "ready-to-merge", repo_path)
+                notify(config, f"✅ PR approved for issue #{issue_number}, ready to merge", "ready-to-merge")
+            else:
+                curr_state = "changes-requested"
+                transition_label(issue_number, label_on_start, "changes-requested", repo_path)
+                notify(config, f"🔄 Changes requested for issue #{issue_number} (attempt {attempt})", "changes-requested")
+
+                if attempt >= 3:
+                    transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
+                    cleanup_workspace(config, issue_number)
+                    notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
+                    curr_state = "human-review-required"
+
+        write_state_log(
+            config, issue_number, agent["name"], role_name,
+            label_on_start, curr_state, attempt,
+            result.stdout, result.stderr,
+        )
+
+    finally:
+        release_lock(agent["name"], issue_number)
+
+
+def main():
+    config = load_config()
+    repo_path = config["pipeline"]["repo_path"]
+
+    try:
+        validate_gitignore(repo_path)
+    except Exception as e:
+        log.error("gitignore validation failed: %s", e)
+        sys.exit(1)
+
+    roles = config.get("roles", {})
+
+    for role_name, role_cfg in roles.items():
+        capacity = calculate_role_capacity(config, role_name)
+        if capacity <= 0:
+            log.info("No capacity for role '%s', skipping", role_name)
+            continue
+
+        issues = poll_issues(role_cfg["pickup_label"], repo_path)
+        log.info("Role '%s': %d issue(s) available, capacity %d", role_name, len(issues), capacity)
+
+        for issue in issues[:capacity]:
+            try:
+                process_issue(config, issue, role_name, role_cfg)
+            except Exception as e:
+                log.error("Error processing issue #%s: %s", issue.get("number"), e)
+
+
+if __name__ == "__main__":
+    main()
