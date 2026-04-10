@@ -192,3 +192,48 @@ def count_active_locks(agent_name):
     return len(get_active_locks(agent_name))
 
 
+# ---------------------------------------------------------------------------
+# Workspace
+# ---------------------------------------------------------------------------
+
+def _workspace_path(config, issue_number):
+    base = os.path.expanduser(config["pipeline"]["workspace_base"])
+    return Path(base) / f"issue-{issue_number}"
+
+
+def create_workspace(config, issue_number):
+    workspace = _workspace_path(config, issue_number)
+    if workspace.exists():
+        return workspace
+    workspace.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        ["git", "worktree", "add", "-b", f"agent/issue-{issue_number}", str(workspace), "main"],
+        cwd=config["pipeline"]["repo_path"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git worktree add failed: {result.stderr}")
+    return workspace
+
+
+def cleanup_workspace(config, issue_number):
+    workspace = _workspace_path(config, issue_number)
+    repo_path = config["pipeline"]["repo_path"]
+    subprocess.run(
+        ["git", "worktree", "remove", str(workspace), "--force"],
+        cwd=repo_path, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "branch", "-d", f"agent/issue-{issue_number}"],
+        cwd=repo_path, capture_output=True,
+    )
+    current = Path(os.path.expanduser(config["pipeline"]["state_base"])).parent / "current" / f"issue-{issue_number}"
+    current.unlink(missing_ok=True)
+
+
+def write_issue_context(config, issue_number, context_text):
+    workspace = _workspace_path(config, issue_number)
+    (workspace / "ISSUE.md").write_text(context_text)
+
+
