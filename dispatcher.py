@@ -291,3 +291,53 @@ def run_agent(agent, workspace_path):
     return result
 
 
+# ---------------------------------------------------------------------------
+# State logging
+# ---------------------------------------------------------------------------
+
+def _state_dir(config, issue_number):
+    base = Path(os.path.expanduser(config["pipeline"]["state_base"]))
+    d = base / f"issue-{issue_number}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def get_next_log_index(config, issue_number):
+    d = _state_dir(config, issue_number)
+    existing = sorted(d.glob("*.log"))
+    if not existing:
+        return 1
+    last = existing[-1].name
+    return int(last.split("-")[0]) + 1
+
+
+def get_attempt_count(config, issue_number):
+    d = _state_dir(config, issue_number)
+    return len(list(d.glob("*-changes-requested.log")))
+
+
+def write_state_log(config, issue_number, agent_name, role, prev_state, curr_state, attempt, stdout="", stderr=""):
+    d = _state_dir(config, issue_number)
+    idx = get_next_log_index(config, issue_number)
+    log_file = d / f"{idx:02d}-{curr_state}.log"
+    content = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "issue": issue_number,
+        "agent": agent_name,
+        "role": role,
+        "prev_state": prev_state,
+        "curr_state": curr_state,
+        "attempt": attempt,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+    log_file.write_text(yaml.dump(content, allow_unicode=True))
+
+    # Update current/ symlink
+    current_dir = Path(os.path.expanduser(config["pipeline"]["state_base"])).parent / "current"
+    current_dir.mkdir(parents=True, exist_ok=True)
+    symlink = current_dir / f"issue-{issue_number}"
+    symlink.unlink(missing_ok=True)
+    symlink.symlink_to(log_file)
+
+
