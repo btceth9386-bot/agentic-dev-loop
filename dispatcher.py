@@ -7,7 +7,9 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -321,7 +323,7 @@ def write_state_log(config, issue_number, agent_name, role, prev_state, curr_sta
     idx = get_next_log_index(config, issue_number)
     log_file = d / f"{idx:02d}-{curr_state}.log"
     content = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "issue": issue_number,
         "agent": agent_name,
         "role": role,
@@ -361,7 +363,6 @@ def _notify_telegram(cfg, message):
     chat_id = cfg.get("chat_id")
     if not token or not chat_id:
         return
-    import urllib.request, urllib.parse, json as _json
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}).encode()
     try:
         urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=10)
@@ -373,7 +374,7 @@ def _notify_discord(cfg, message):
     webhook_url = cfg.get("webhook_url")
     if not webhook_url:
         return
-    import urllib.request, json as _json
+    import json as _json
     data = _json.dumps({"content": message}).encode()
     req = urllib.request.Request(webhook_url, data=data, headers={"Content-Type": "application/json"})
     try:
