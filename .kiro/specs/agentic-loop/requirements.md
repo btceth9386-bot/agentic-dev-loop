@@ -124,8 +124,8 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 #### Acceptance Criteria
 
 1. WHEN an issue is labeled `in-progress`, THE Dispatcher SHALL spawn the selected Coding_Agent as a subprocess with `cwd` set to the issue worktree.
-2. WHEN the Coding_Agent subprocess exits with code 0, THE Dispatcher SHALL transition the issue label from `in-progress` to `pr-opened`.
-3. IF the Coding_Agent subprocess exits with a non-zero code, THEN THE Dispatcher SHALL log the failure in the State_Log and send a notification.
+2. WHEN the Coding_Agent subprocess exits with code 0, OR a pull request exists on GitHub for the branch `agent/issue-<number>`, THE Dispatcher SHALL transition the issue label from `in-progress` to `pr-opened`.
+3. IF the Coding_Agent subprocess exits with a non-zero code AND no pull request exists on GitHub for the branch `agent/issue-<number>`, THEN THE Dispatcher SHALL log the failure in the State_Log and send a notification.
 4. THE Dispatcher SHALL capture stdout and stderr from the Coding_Agent subprocess using `capture_output=True`.
 5. THE Coding_Agent SHALL include a closing keyword referencing the issue number in the pull request title using the format `Fix #<issue_number>: <description>`, so that merging the PR into the default branch automatically closes the linked GitHub issue.
 6. WHEN the Dispatcher assigns a Coding_Agent to an issue, THE Dispatcher SHALL post a comment on the GitHub issue containing the agent name, role, and attempt number using the format `🤖 Assigned to **<agent_name>** (<role>) — attempt <N>`.
@@ -138,10 +138,11 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 
 1. WHEN an issue carries the label specified by the review role's `pickup_label` field in the Agents_Config (default: `pr-opened`), THE Dispatcher SHALL spawn the selected Review_Agent as a subprocess with `cwd` set to the issue worktree.
 2. WHEN the Dispatcher spawns the Review_Agent, THE Dispatcher SHALL atomically remove the review role's Pickup_Label and apply the review role's `label_on_start` label (default: `reviewing`) to the issue.
-3. WHEN the Review_Agent approves the PR, THE Dispatcher SHALL transition the issue label from `reviewing` to `ready-to-merge`.
-4. WHEN the Review_Agent requests changes, THE Dispatcher SHALL transition the issue label from `reviewing` to `changes-requested`.
+3. WHEN the Review_Agent subprocess exits with code 0 AND the GitHub PR has at least one APPROVED review, THE Dispatcher SHALL transition the issue label from `reviewing` to `ready-to-merge`.
+4. WHEN the Review_Agent subprocess exits with a non-zero code OR the PR does not have an APPROVED review, AND the PR has review comments or a CHANGES_REQUESTED review on GitHub, THE Dispatcher SHALL transition the issue label from `reviewing` to `changes-requested`.
 5. THE Dispatcher SHALL capture stdout and stderr from the Review_Agent subprocess using `capture_output=True`.
 6. WHEN the Dispatcher assigns a Review_Agent to an issue, THE Dispatcher SHALL post a comment on the GitHub issue containing the agent name, role, and attempt number using the format `🤖 Assigned to **<agent_name>** (<role>) — attempt <N>`.
+7. IF the Review_Agent subprocess exits with a non-zero code AND no review comments or CHANGES_REQUESTED review exist on the PR, THE Dispatcher SHALL log a warning and skip the label transition.
 
 ### Requirement 9: Change Request Handling and Retry Loop
 

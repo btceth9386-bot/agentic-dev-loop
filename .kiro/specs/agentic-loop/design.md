@@ -591,24 +591,24 @@ def pick_agent(agents, role, round_robin_state):
 ```
 def process_result(issue, agent, role, exit_code, stdout, stderr):
     if role == "coding":
-        if exit_code == 0:
+        if exit_code == 0 or pr_exists(repo_path, issue.number):
             transition_label(issue, "in-progress", "pr-opened")
         else:
             log_failure(issue, agent, stdout, stderr)
             notify("Coding agent failed on issue #{issue.number}")
 
     elif role == "review":
-        if exit_code == 0:
-            # Parse stdout to determine approval vs changes-requested
-            if "approved" in stdout.lower():
-                transition_label(issue, "reviewing", "ready-to-merge")
-            else:
-                transition_label(issue, "reviewing", "changes-requested")
-                attempts = get_attempt_count(issue.number)
-                if attempts >= 3:
-                    transition_label(issue, "changes-requested", "human-review-required")
-                    cleanup_workspace(issue.number)
-                    notify("Issue #{issue.number} escalated to human review")
+        if exit_code == 0 and pr_is_approved(repo_path, issue.number):
+            transition_label(issue, "reviewing", "ready-to-merge")
+        elif pr_has_review_comments(repo_path, issue.number):
+            transition_label(issue, "reviewing", "changes-requested")
+            attempts = get_attempt_count(issue.number)
+            if attempts >= 3:
+                transition_label(issue, "changes-requested", "human-review-required")
+                cleanup_workspace(issue.number)
+                notify("Issue #{issue.number} escalated to human review")
+        else:
+            log_warning("Review agent failed but no review comments found, skipping transition")
 ```
 
 #### Change-Request Retry Comment

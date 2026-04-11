@@ -400,6 +400,97 @@ def test_pr_has_review_comments_false():
 
 
 # ---------------------------------------------------------------------------
+# process_issue — coding role
+# ---------------------------------------------------------------------------
+
+def _make_issue(number=42):
+    return {"number": number, "title": "Test issue"}
+
+
+def _patch_process_deps(tmp_path, base_config, agent_exit=0, pr_exists=True, pr_approved=True, pr_has_comments=True):
+    """Return a context manager stack patching all external calls in process_issue."""
+    from contextlib import ExitStack
+    ws = Path(base_config["pipeline"]["workspace_base"]) / f"issue-{_make_issue()['number']}"
+    ws.mkdir(parents=True, exist_ok=True)
+
+    stack = ExitStack()
+    stack.enter_context(patch("dispatcher.transition_label", return_value=True))
+    stack.enter_context(patch("dispatcher.create_workspace", return_value=ws))
+    stack.enter_context(patch("dispatcher.fetch_issue_context", return_value="# Issue"))
+    stack.enter_context(patch("dispatcher.fetch_pr_context", return_value=None))
+    stack.enter_context(patch("dispatcher.write_issue_context"))
+    stack.enter_context(patch("dispatcher.post_assignment_comment"))
+    stack.enter_context(patch("dispatcher.notify"))
+    stack.enter_context(patch("dispatcher.pr_exists", return_value=pr_exists))
+    stack.enter_context(patch("dispatcher.pr_is_approved", return_value=pr_approved))
+    stack.enter_context(patch("dispatcher.pr_has_review_comments", return_value=pr_has_comments))
+    mock_result = MagicMock()
+    mock_result.returncode = agent_exit
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+    stack.enter_context(patch("dispatcher.run_agent", return_value=mock_result))
+    return stack
+
+
+def test_coding_transitions_pr_opened_on_exit0(tmp_path, base_config):
+    with _patch_process_deps(tmp_path, base_config) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            d.process_issue(base_config, _make_issue(), "coding", base_config["roles"]["coding"])
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log["curr_state"] == "pr-opened"
+
+
+def test_coding_transitions_pr_opened_when_pr_exists_despite_nonzero(tmp_path, base_config):
+    with _patch_process_deps(tmp_path, base_config, agent_exit=1, pr_exists=True) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            d.process_issue(base_config, _make_issue(), "coding", base_config["roles"]["coding"])
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log["curr_state"] == "pr-opened"
+
+
+def test_coding_fails_when_no_pr_and_nonzero(tmp_path, base_config):
+    with _patch_process_deps(tmp_path, base_config, agent_exit=1, pr_exists=False) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            d.process_issue(base_config, _make_issue(), "coding", base_config["roles"]["coding"])
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log["curr_state"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# process_issue — review role
+# ---------------------------------------------------------------------------
+
+def test_review_transitions_ready_to_merge(tmp_path, base_config):
+    with _patch_process_deps(tmp_path, base_config, agent_exit=0, pr_approved=True) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            d.process_issue(base_config, _make_issue(), "review", base_config["roles"]["review"])
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log["curr_state"] == "ready-to-merge"
+
+
+def test_review_transitions_changes_requested_when_comments(tmp_path, base_config):
+    with _patch_process_deps(tmp_path, base_config, agent_exit=1, pr_approved=False, pr_has_comments=True) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            d.process_issue(base_config, _make_issue(), "review", base_config["roles"]["review"])
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log["curr_state"] == "changes-requested"
+
+
+def test_review_skips_transition_when_no_comments(tmp_path, base_config, caplog):
+    import logging
+    with _patch_process_deps(tmp_path, base_config, agent_exit=1, pr_approved=False, pr_has_comments=False) as _:
+        with patch.object(d, "LOCK_DIR", tmp_path):
+            with caplog.at_level(logging.WARNING):
+                d.process_issue(base_config, _make_issue(), "review", base_config["roles"]["review"])
+    assert "no review comments" in caplog.text
+
+
+# ---------------------------------------------------------------------------
 # fetch_pr_context
 # ---------------------------------------------------------------------------
 
