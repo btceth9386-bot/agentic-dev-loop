@@ -346,6 +346,39 @@ def test_write_state_log_updates_symlink(tmp_path, base_config):
 
 
 # ---------------------------------------------------------------------------
+# pr_exists / pr_is_approved
+# ---------------------------------------------------------------------------
+
+def test_pr_exists_true():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run(json.dumps([{"number": 5}]))):
+        assert d.pr_exists(42, "/repo") is True
+
+
+def test_pr_exists_false():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("[]")):
+        assert d.pr_exists(42, "/repo") is False
+
+
+def test_pr_is_approved_true():
+    pr_list = [{"number": 5}]
+    pr_detail = {"reviews": [{"state": "APPROVED", "author": {"login": "bob"}}]}
+    with patch("dispatcher.subprocess.run", side_effect=[_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]):
+        assert d.pr_is_approved(42, "/repo") is True
+
+
+def test_pr_is_approved_false_no_approval():
+    pr_list = [{"number": 5}]
+    pr_detail = {"reviews": [{"state": "CHANGES_REQUESTED", "author": {"login": "bob"}}]}
+    with patch("dispatcher.subprocess.run", side_effect=[_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]):
+        assert d.pr_is_approved(42, "/repo") is False
+
+
+def test_pr_is_approved_false_no_pr():
+    with patch("dispatcher.subprocess.run", return_value=_mock_run("[]")):
+        assert d.pr_is_approved(42, "/repo") is False
+
+
+# ---------------------------------------------------------------------------
 # fetch_pr_context
 # ---------------------------------------------------------------------------
 

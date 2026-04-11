@@ -189,6 +189,38 @@ def fetch_pr_context(issue_number, repo_path):
     return "\n".join(lines)
 
 
+def pr_exists(issue_number, repo_path):
+    """Return True if a PR exists for agent/issue-<N> branch."""
+    import json
+    result = _gh(
+        ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number", "--limit", "1"],
+        repo_path,
+    )
+    if result.returncode != 0:
+        return False
+    prs = json.loads(result.stdout or "[]")
+    return len(prs) > 0
+
+
+def pr_is_approved(issue_number, repo_path):
+    """Return True if the PR for agent/issue-<N> has at least one APPROVED review."""
+    import json
+    result = _gh(
+        ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number", "--limit", "1"],
+        repo_path,
+    )
+    if result.returncode != 0:
+        return False
+    prs = json.loads(result.stdout or "[]")
+    if not prs:
+        return False
+    detail = _gh(["pr", "view", str(prs[0]["number"]), "--json", "reviews"], repo_path)
+    if detail.returncode != 0:
+        return False
+    reviews = json.loads(detail.stdout).get("reviews", [])
+    return any(r.get("state") == "APPROVED" for r in reviews)
+
+
 def post_assignment_comment(issue_number, agent_name, role, attempt, repo_path, is_retry=False):
     label = "retry attempt" if is_retry else "attempt"
     body = f"🤖 Assigned to **{agent_name}** ({role}) — {label} {attempt}"
@@ -480,17 +512,17 @@ def process_issue(config, issue, role_name, role_cfg):
         success = result.returncode == 0
 
         if role_name == "coding":
-            curr_state = label_on_done if success else "failed"
-            if success:
+            if success or pr_exists(issue_number, repo_path):
+                curr_state = label_on_done
                 transition_label(issue_number, label_on_start, label_on_done, repo_path)
                 notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
             else:
-                log.error("Coding agent failed for #%s", issue_number)
+                curr_state = "failed"
+                log.error("Coding agent failed and no PR found for #%s", issue_number)
                 notify(config, f"❌ Coding agent failed for issue #{issue_number}", "failed")
 
         elif role_name == "review":
-            # Determine outcome from exit code: 0=approve, 1=changes-requested
-            if success:
+            if success and pr_is_approved(issue_number, repo_path):
                 curr_state = "ready-to-merge"
                 transition_label(issue_number, label_on_start, "ready-to-merge", repo_path)
                 notify(config, f"✅ PR approved for issue #{issue_number}, ready to merge", "ready-to-merge")
