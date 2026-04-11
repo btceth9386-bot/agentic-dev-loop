@@ -127,11 +127,24 @@ ln -s $(pwd)/skills/agentic-coder ~/.kiro/skills/agentic-coder
 ln -s $(pwd)/skills/agentic-reviewer ~/.kiro/skills/agentic-reviewer
 ```
 
-**4. Add `AGENTS.md` to your target repo**
+Also install the [`gh-cli`](https://skills.sh/github/awesome-copilot/gh-cli) skill — it teaches agents how to use the GitHub CLI effectively for PR operations, issue management, and more:
 ```bash
-cp AGENTS.md /path/to/your/repo/AGENTS.md
-# Edit it to describe your project structure and conventions
+# download and install gh-cli skill
+gh skills install github/awesome-copilot/gh-cli   # or copy manually to your skills dir
 ```
+
+**4. Add `AGENTS.md` to your target repo**
+
+`AGENTS.md` is the project context file that agents read before doing any work. The easiest way to generate it is with kiro-cli's `/code summary` command — it analyses your codebase and produces a concise summary of the architecture, conventions, and key files:
+
+```bash
+cd /path/to/your/repo
+kiro-cli
+# inside kiro: /code summary
+# save the output as AGENTS.md
+```
+
+Then review and edit it to add any project-specific conventions or rules you want agents to follow.
 
 **5. Set up crontab**
 ```bash
