@@ -53,23 +53,52 @@ Prefer minimal, focused changes. Do not refactor unrelated code.
 
 ## Step 6 — Commit
 
-1. Stage only the files relevant to the issue.
-2. Write a clear, conventional commit message:
-   ```
-   <type>(<scope>): <short description>
-   ```
-3. Do not commit unrelated changes, lock files, or generated artifacts unless they are
-   part of the issue.
+Follow the `conventional-commit` skill conventions. Each commit should be a single,
+stable change. Determine the type from the issue:
+
+| Issue type | Commit type |
+|------------|-------------|
+| New feature / enhancement | `feat` |
+| Bug fix | `fix` |
+| Docs only | `docs` |
+| Tests only | `test` |
+| Refactor | `refactor` |
+
+Infer `<scope>` from the primary module or directory changed (e.g. `dispatcher`, `config`, `workspace`).
+
+```
+<type>(<scope>): <subject in imperative mood>
+```
+
+Example:
+```
+feat(dispatcher): add per-agent env map for credential isolation
+```
+
+Do not include the issue number in the commit message — it belongs in the PR title.
 
 ## Step 7 — Push and open PR
 
 1. Push the branch to origin.
-2. Create a PR with the title format:
+2. Determine PR type from the issue:
+   - New feature / enhancement → `feat`
+   - Bug fix → `fix`
+
+3. Create the PR with title:
    ```
-   Fix #<issue_number>: <short description>
+   feat(<scope>): <short description> (#<issue_number>)
    ```
-   The `Fix #<N>` closing keyword is mandatory — it auto-closes the issue on merge.
-3. In the PR body, include:
+   or
+   ```
+   fix(<scope>): <short description> (#<issue_number>)
+   ```
+   Example: `feat(dispatcher): add per-agent env map (#42)`
+
+4. In the PR body, use the appropriate closing keyword:
+   - Feature: `resolve #<issue_number>`
+   - Bug fix: `fix #<issue_number>`
+
+5. Also include in the PR body:
    - What was changed and why
    - How to test it
    - Any known limitations or follow-up items
