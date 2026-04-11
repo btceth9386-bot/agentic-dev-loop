@@ -107,9 +107,30 @@ See [`agents.example.yml`](agents.example.yml) for a full annotated example.
 
 Key sections:
 - `pipeline` — repo path, workspace and state directories
-- `agents` — list of agent CLIs with role, command, and concurrency settings
+- `agents` — list of agent CLIs with role, command, concurrency settings, and optional `env` map
 - `roles` — label transitions per role
 - `notifications` — optional Telegram / Discord webhooks
+
+### Per-agent credentials
+
+Use the `env` field to give each agent its own GitHub token, so the coder and reviewer operate as separate GitHub accounts:
+
+```yaml
+agents:
+  - name: kiro-cli
+    role: coding
+    command: "kiro-cli --resume --agent senior --no-interactive"
+    env:
+      GH_TOKEN: "${CODER_GH_TOKEN}"   # GitHub account that opens PRs
+
+  - name: claude
+    role: review
+    command: "claude --dangerously-skip-permissions -p '...'"
+    env:
+      GH_TOKEN: "${REVIEWER_GH_TOKEN}" # Separate GitHub account that approves PRs
+```
+
+The `env` map is merged into the subprocess environment at spawn time, overriding any existing variables with the same name. All values support `${VAR_NAME}` expansion.
 
 ## Observability
 

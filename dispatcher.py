@@ -63,6 +63,7 @@ def load_config(path=AGENTS_YML):
             if field not in agent:
                 raise ValueError(f"Agent missing required field '{field}': {agent}")
         agent.setdefault("cooldown_minutes", 0)
+        agent.setdefault("env", {})
 
     # Validate roles
     for role_name, role in config.get("roles", {}).items():
@@ -383,11 +384,13 @@ def pick_agent(config, role):
 
 def run_agent(agent, workspace_path):
     import shlex
+    env = {**os.environ, **agent.get("env", {})}
     result = subprocess.run(
         shlex.split(agent["command"]),
         cwd=str(workspace_path),
         capture_output=True,
         text=True,
+        env=env,
     )
     return result
 

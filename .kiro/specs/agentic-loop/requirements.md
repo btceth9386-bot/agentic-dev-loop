@@ -58,11 +58,12 @@ Agentic Loop is a local multi-agent CI/CD pipeline for macOS and Linux that auto
 
 #### Acceptance Criteria
 
-1. THE Dispatcher SHALL read agent definitions from the Agents_Config file, including name, role, command, max_concurrent, and cooldown_minutes fields.
+1. THE Dispatcher SHALL read agent definitions from the Agents_Config file, including name, role, command, max_concurrent, cooldown_minutes, and optional env fields.
 2. THE Agents_Config `command` field SHALL contain the complete CLI invocation for the agent, including any prompt or role assignment flags and any resume flags the user desires (e.g., `--resume`), and THE Dispatcher SHALL execute the same command for both initial runs and retries without constructing or modifying the invocation.
 3. WHEN the Agents_Config file is modified, THE Dispatcher SHALL pick up the changes on the next poll cycle without requiring a restart.
 4. THE Agents_Config SHALL define `pickup_label`, `label_on_start`, and `label_on_done` for each role.
 5. WHEN the Dispatcher loads the Agents_Config file, THE Dispatcher SHALL validate that each agent entry contains the required fields: name, role, command, and max_concurrent.
+6. WHEN an agent definition includes an optional `env` map, THE Dispatcher SHALL merge those key-value pairs into the subprocess environment when spawning that agent, overriding any existing environment variables with the same name. This allows different agents to use separate credentials (e.g., distinct `GH_TOKEN` values for coder and reviewer accounts).
 6. WHEN the Dispatcher loads the Agents_Config file, THE Dispatcher SHALL validate that each role definition contains the required fields: `pickup_label`, `label_on_start`, and `label_on_done`.
 7. IF a required field is missing from an agent entry in the Agents_Config file, THEN THE Dispatcher SHALL fail immediately with a descriptive error message identifying the agent entry and the missing field.
 8. IF a required field is missing from a role definition in the Agents_Config file, THEN THE Dispatcher SHALL fail immediately with a descriptive error message identifying the role and the missing field.

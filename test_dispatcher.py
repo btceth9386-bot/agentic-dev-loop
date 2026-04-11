@@ -491,6 +491,28 @@ def test_review_skips_transition_when_no_comments(tmp_path, base_config, caplog)
 
 
 # ---------------------------------------------------------------------------
+# run_agent env merging
+# ---------------------------------------------------------------------------
+
+def test_run_agent_merges_env(tmp_path):
+    agent = {"command": "echo hi", "env": {"GH_TOKEN": "test-token-123"}}
+    with patch("dispatcher.subprocess.run") as mock:
+        mock.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        d.run_agent(agent, tmp_path)
+    env_passed = mock.call_args[1]["env"]
+    assert env_passed["GH_TOKEN"] == "test-token-123"
+
+
+def test_run_agent_no_env(tmp_path):
+    agent = {"command": "echo hi", "env": {}}
+    with patch("dispatcher.subprocess.run") as mock:
+        mock.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        d.run_agent(agent, tmp_path)
+    env_passed = mock.call_args[1]["env"]
+    assert "PATH" in env_passed  # inherits os.environ
+
+
+# ---------------------------------------------------------------------------
 # fetch_pr_context
 # ---------------------------------------------------------------------------
 
