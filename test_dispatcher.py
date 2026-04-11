@@ -378,6 +378,27 @@ def test_pr_is_approved_false_no_pr():
         assert d.pr_is_approved(42, "/repo") is False
 
 
+def test_pr_has_review_comments_true_changes_requested():
+    pr_list = [{"number": 5}]
+    pr_detail = {"reviews": [{"state": "CHANGES_REQUESTED"}], "comments": []}
+    with patch("dispatcher.subprocess.run", side_effect=[_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]):
+        assert d.pr_has_review_comments(42, "/repo") is True
+
+
+def test_pr_has_review_comments_true_has_comments():
+    pr_list = [{"number": 5}]
+    pr_detail = {"reviews": [], "comments": [{"body": "please fix this"}]}
+    with patch("dispatcher.subprocess.run", side_effect=[_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]):
+        assert d.pr_has_review_comments(42, "/repo") is True
+
+
+def test_pr_has_review_comments_false():
+    pr_list = [{"number": 5}]
+    pr_detail = {"reviews": [], "comments": []}
+    with patch("dispatcher.subprocess.run", side_effect=[_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]):
+        assert d.pr_has_review_comments(42, "/repo") is False
+
+
 # ---------------------------------------------------------------------------
 # fetch_pr_context
 # ---------------------------------------------------------------------------

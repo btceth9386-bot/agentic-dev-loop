@@ -221,6 +221,27 @@ def pr_is_approved(issue_number, repo_path):
     return any(r.get("state") == "APPROVED" for r in reviews)
 
 
+def pr_has_review_comments(issue_number, repo_path):
+    """Return True if the PR for agent/issue-<N> has review comments or change-request reviews."""
+    import json
+    result = _gh(
+        ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number", "--limit", "1"],
+        repo_path,
+    )
+    if result.returncode != 0:
+        return False
+    prs = json.loads(result.stdout or "[]")
+    if not prs:
+        return False
+    detail = _gh(["pr", "view", str(prs[0]["number"]), "--json", "reviews,comments"], repo_path)
+    if detail.returncode != 0:
+        return False
+    data = json.loads(detail.stdout)
+    has_changes_requested = any(r.get("state") == "CHANGES_REQUESTED" for r in data.get("reviews", []))
+    has_comments = len(data.get("comments", [])) > 0
+    return has_changes_requested or has_comments
+
+
 def post_assignment_comment(issue_number, agent_name, role, attempt, repo_path, is_retry=False):
     label = "retry attempt" if is_retry else "attempt"
     body = f"🤖 Assigned to **{agent_name}** ({role}) — {label} {attempt}"
@@ -527,15 +548,19 @@ def process_issue(config, issue, role_name, role_cfg):
                 transition_label(issue_number, label_on_start, "ready-to-merge", repo_path)
                 notify(config, f"✅ PR approved for issue #{issue_number}, ready to merge", "ready-to-merge")
             else:
-                curr_state = "changes-requested"
-                transition_label(issue_number, label_on_start, "changes-requested", repo_path)
-                notify(config, f"🔄 Changes requested for issue #{issue_number} (attempt {attempt})", "changes-requested")
+                if not pr_has_review_comments(issue_number, repo_path):
+                    log.warning("Review agent exit non-zero but no review comments found for #%s, skipping transition", issue_number)
+                    curr_state = label_on_start
+                else:
+                    curr_state = "changes-requested"
+                    transition_label(issue_number, label_on_start, "changes-requested", repo_path)
+                    notify(config, f"🔄 Changes requested for issue #{issue_number} (attempt {attempt})", "changes-requested")
 
-                if attempt >= 3:
-                    transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
-                    cleanup_workspace(config, issue_number)
-                    notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
-                    curr_state = "human-review-required"
+                    if attempt >= 3:
+                        transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
+                        cleanup_workspace(config, issue_number)
+                        notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
+                        curr_state = "human-review-required"
 
         write_state_log(
             config, issue_number, agent["name"], role_name,
