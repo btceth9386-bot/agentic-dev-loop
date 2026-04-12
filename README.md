@@ -152,7 +152,22 @@ crontab -e
 # Paste contents of config/crontab.example (update paths first)
 ```
 
-**6. Apply the `todo` label to a GitHub Issue and watch it go.**
+> `workspace_base` and `state_base` directories are created automatically by the dispatcher on first run — no need to `mkdir` them manually.
+
+**6. Test notifications**
+
+Before running the full pipeline, verify your Telegram/Discord setup:
+```bash
+source .env  # or export vars inline
+.venv/bin/python3 scripts/test-notifications.py
+```
+
+**7. Apply the `todo` label to a GitHub Issue and watch it go.**
+
+For manual testing (recommended before setting up crontab):
+```bash
+source .env && .venv/bin/python3 dispatcher.py
+```
 
 ## Label State Machine
 
