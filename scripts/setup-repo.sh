@@ -35,10 +35,9 @@ echo "Labels created."
 # ---------------------------------------------------------------------------
 echo ""
 echo "Configuring repo merge settings (squash only)..."
-gh repo edit "$REPO" \
-  --enable-squash-merge \
-  --disable-merge-commit \
-  --disable-rebase-merge
+gh repo edit "$REPO" --enable-squash-merge
+# Note: gh cli does not support disabling merge-commit/rebase via flags.
+# To restrict to squash-only, go to: Settings → General → Pull Requests
 
 echo "Merge settings updated."
 
