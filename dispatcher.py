@@ -478,7 +478,10 @@ def _notify_discord(cfg, message):
         return
     import json as _json
     data = _json.dumps({"content": message}).encode()
-    req = urllib.request.Request(webhook_url, data=data, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(webhook_url, data=data, headers={
+        "Content-Type": "application/json",
+        "User-Agent": "agentic-loop/1.0",
+    })
     try:
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
