@@ -143,7 +143,7 @@ crontab -e
 agents:
   - name: kiro-cli
     role: coding
-    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md and AGENTS.md first, then follow the agentic-coder skill to implement, commit, push, and open a PR.'"
+    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md first then begin'"
     max_concurrent: 2
     cooldown_minutes: 0
     env:
@@ -151,7 +151,7 @@ agents:
 
   - name: claude
     role: review
-    command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-5 -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
+    command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-6 -p 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
     cooldown_minutes: 0
     env:
@@ -176,6 +176,29 @@ notifications:
 ```
 
 ## Troubleshooting (for AI agent)
+
+### Skills not auto-loading
+
+Skills load automatically when the prompt matches the skill's `description`. For this to work, skills must be declared in the agent's config:
+
+**kiro-cli** — add skills to `~/.kiro/agents/<agent-name>.md`:
+```markdown
+---
+name: senior
+description: Senior engineer for implementation
+tools: Read,Write,Bash,Grep,Glob
+skills:
+  - agentic-coder
+  - conventional-commit
+---
+```
+
+**claude** — add skills to the agent profile's `skills:` list.
+
+If skills still don't auto-load, explicitly reference the skill in the command:
+```
+'You are a coder. Read ISSUE.md first, then follow the agentic-coder skill to implement, commit, push, and open a PR.'
+```
 
 ### Issue stuck in a label state
 

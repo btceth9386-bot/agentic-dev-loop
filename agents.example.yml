@@ -8,7 +8,7 @@ agents:
   # Use the env field to inject per-agent environment variables (e.g. separate GH_TOKEN per agent)
   - name: kiro-cli
     role: coding
-    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md and AGENTS.md first, then follow the agentic-coder skill to implement, commit, push, and open a PR.'"
+    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md first then begin'"
     max_concurrent: 2
     cooldown_minutes: 0
     env:
@@ -16,7 +16,7 @@ agents:
 
   - name: claude
     role: review
-    command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-6 -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
+    command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-6 -p 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
     cooldown_minutes: 0
     env:
@@ -24,7 +24,7 @@ agents:
 
   - name: codex
     role: review
-    command: "codex exec --yolo --skip-git-repo-check --model gpt-5.4 resume --last 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
+    command: "codex exec --yolo --skip-git-repo-check --model gpt-5.4 resume --last 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
     cooldown_minutes: 0
     env:
