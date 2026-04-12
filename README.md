@@ -169,12 +169,12 @@ gh skills install github/awesome-copilot/gh-cli   # or copy manually to your ski
 > Skills load automatically when the prompt matches the skill's `description`. For this to work, skills must be declared in the agent's config file:
 >
 > **kiro-cli** — add to `~/.kiro/agents/<agent-name>.md`:
-> ```markdown
-> skills:
->   - agentic-coder      # or agentic-reviewer for review role
->   - conventional-commit
+> ```json
+> "resources": [
+>   "skill://~/.kiro/skills/**/SKILL.md"
+> ]
 > ```
-> **claude** — add to your agent profile's `skills:` list similarly.
+> **claude** — add to your agent profile's `skills:` list.
 >
 > If skills don't auto-load, see the troubleshooting section in `AGENTS.md`.
 

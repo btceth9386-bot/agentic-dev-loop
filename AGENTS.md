@@ -181,16 +181,11 @@ notifications:
 
 Skills load automatically when the prompt matches the skill's `description`. For this to work, skills must be declared in the agent's config:
 
-**kiro-cli** — add skills to `~/.kiro/agents/<agent-name>.md`:
-```markdown
----
-name: senior
-description: Senior engineer for implementation
-tools: Read,Write,Bash,Grep,Glob
-skills:
-  - agentic-coder
-  - conventional-commit
----
+**kiro-cli** — add to `~/.kiro/agents/<agent-name>.md`:
+```json
+"resources": [
+  "skill://~/.kiro/skills/**/SKILL.md"
+]
 ```
 
 **claude** — add skills to the agent profile's `skills:` list.
