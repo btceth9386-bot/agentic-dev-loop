@@ -583,6 +583,115 @@ def process_issue(config, issue, role_name, role_cfg):
         release_lock(agent["name"], issue_number)
 
 
+def cleanup_merged_workspaces(config):
+    """Cleanup workspaces for issues that have been closed/merged."""
+    import json
+    base = Path(os.path.expanduser(config["pipeline"]["workspace_base"]))
+    if not base.exists():
+        return
+    repo_path = config["pipeline"]["repo_path"]
+    for workspace in base.iterdir():
+        if not workspace.name.startswith("issue-"):
+            continue
+        issue_number = int(workspace.name.split("-")[1])
+        result = _gh(["issue", "view", str(issue_number), "--json", "state"], repo_path)
+        if result.returncode != 0:
+            continue
+        state = json.loads(result.stdout).get("state", "")
+        if state == "CLOSED":
+            log.info("Issue #%s is closed, cleaning up workspace", issue_number)
+            cleanup_workspace(config, issue_number)
+            notify(config, f"🧹 Issue #{issue_number} workspace cleaned up after merge", "ready-to-merge")
+    issue_number = issue["number"]
+    pickup_label = role_cfg["pickup_label"]
+    label_on_start = role_cfg["label_on_start"]
+    label_on_done = role_cfg["label_on_done"]
+    repo_path = config["pipeline"]["repo_path"]
+
+    log.info("Picking up issue #%s for role '%s'", issue_number, role_name)
+
+    # Transition label to in-progress/reviewing
+    if not transition_label(issue_number, pickup_label, label_on_start, repo_path):
+        return
+
+    attempt = get_attempt_count(config, issue_number) + 1
+
+    # Workspace
+    try:
+        workspace = create_workspace(config, issue_number)
+    except Exception as e:
+        log.error("Workspace creation failed for #%s: %s", issue_number, e)
+        return
+
+    # Write ISSUE.md
+    try:
+        context = fetch_issue_context(issue_number, repo_path)
+        pr_context = fetch_pr_context(issue_number, repo_path)
+        write_issue_context(config, issue_number, context, pr_context)
+    except Exception as e:
+        log.error("Failed to write ISSUE.md for #%s: %s", issue_number, e)
+
+    # Pick agent
+    agent = pick_agent(config, role_name)
+    if not agent:
+        log.warning("No available agent for role '%s', skipping #%s", role_name, issue_number)
+        return
+
+    if not acquire_lock(agent["name"], issue_number):
+        log.warning("Could not acquire lock for agent %s issue #%s", agent["name"], issue_number)
+        return
+
+    try:
+        post_assignment_comment(issue_number, agent["name"], role_name, attempt, repo_path, is_retry=(attempt > 1))
+        log.info("Running agent '%s' on issue #%s", agent["name"], issue_number)
+        result = run_agent(agent, workspace)
+        success = result.returncode == 0
+
+        if role_name == "coding":
+            if success or pr_exists(issue_number, repo_path):
+                curr_state = label_on_done
+                transition_label(issue_number, label_on_start, label_on_done, repo_path)
+                notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
+            else:
+                curr_state = "agent-error"
+                transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                error_summary = (result.stderr or result.stdout or "no output")[:500]
+                log.error("Coding agent failed for #%s: %s", issue_number, error_summary)
+                notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
+
+        elif role_name == "review":
+            if success and pr_is_approved(issue_number, repo_path):
+                curr_state = "ready-to-merge"
+                transition_label(issue_number, label_on_start, "ready-to-merge", repo_path)
+                notify(config, f"✅ PR approved for issue #{issue_number}, ready to merge", "ready-to-merge")
+            else:
+                if not pr_has_review_comments(issue_number, repo_path):
+                    curr_state = "agent-error"
+                    transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                    error_summary = (result.stderr or result.stdout or "no output")[:500]
+                    log.warning("Review agent failed with no review comments for #%s: %s", issue_number, error_summary)
+                    notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
+                else:
+                    curr_state = "changes-requested"
+                    transition_label(issue_number, label_on_start, "changes-requested", repo_path)
+                    notify(config, f"🔄 Changes requested for issue #{issue_number} (attempt {attempt})", "changes-requested")
+
+                    if attempt >= 3:
+                        transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
+                        cleanup_workspace(config, issue_number)
+                        notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
+                        curr_state = "human-review-required"
+
+        write_state_log(
+            config, issue_number, agent["name"], role_name,
+            label_on_start, curr_state, attempt,
+            result.stdout, result.stderr,
+        )
+
+    finally:
+        release_lock(agent["name"], issue_number)
+
+
 def main():
     config = load_config()
     repo_path = config["pipeline"]["repo_path"]
@@ -594,6 +703,8 @@ def main():
         sys.exit(1)
 
     roles = config.get("roles", {})
+
+    cleanup_merged_workspaces(config)
 
     for role_name, role_cfg in roles.items():
         capacity = calculate_role_capacity(config, role_name)
