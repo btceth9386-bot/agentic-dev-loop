@@ -3,6 +3,18 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTS_YML="${SCRIPT_DIR}/agents.yml"
+
+if [[ ! -f "$AGENTS_YML" ]]; then
+  echo "ERROR: agents.yml not found at $AGENTS_YML" >&2
+  exit 1
+fi
+
+REPO_PATH=$(python3 -c "import yaml; c=yaml.safe_load(open('$AGENTS_YML')); print(c['pipeline']['repo_path'])")
+
+cd "$REPO_PATH"
+
 APPROVED_PRS=$(gh pr list --label "ready-to-merge" --json number --jq '.[].number')
 
 for PR in $APPROVED_PRS; do
