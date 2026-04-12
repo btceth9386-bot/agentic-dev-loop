@@ -16,7 +16,7 @@ agents:
 
   - name: claude
     role: review
-    command: "claude --dangerously-skip-permissions -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
+    command: "claude --dangerously-skip-permissions --resume -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
     max_concurrent: 1
     cooldown_minutes: 0
     env:
