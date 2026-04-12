@@ -1,93 +1,157 @@
-# Agentic Loop
+# Agentic Loop — Setup Guide for AI Agents
 
-A local multi-agent CI/CD pipeline (macOS/Linux) that autonomously handles GitHub Issues through implementation, review, and merge.
+This file is intended to be read by an AI agent (e.g. kiro-cli, claude) to help a user
+set up and operate the agentic-dev-loop pipeline. Read this file fully before taking any action.
+
+## What This Project Does
+
+A local multi-agent CI/CD pipeline that autonomously handles GitHub Issues — from
+implementation to review to merge — with no database, no server, and no webhooks.
 
 ## Project Structure
 
 ```
-agentic-loop/
-  dispatcher.py          # Main orchestrator (entry point, Python)
-  merge.sh               # Auto-merge cronjob script (Bash)
-  agents.yml             # Agent + role configuration (YAML)
+agentic-dev-loop/
+  dispatcher.py          # Main orchestrator (stateless, run via crontab or manually)
+  merge.sh               # Auto-merge script for ready-to-merge PRs
+  agents.example.yml     # Config template — copy to agents.yml and fill in
   config/
     crontab.example      # Crontab setup reference
   scripts/
-    rotate-role.sh       # CLI helper to swap agent roles
+    setup-repo.sh        # Create GitHub labels and configure target repo
+    rotate-role.sh       # Swap an agent's role in agents.yml
     status.sh            # Print current pipeline state
+    test-notifications.py # Test Telegram/Discord notifications
+  skills/
+    agentic-coder/SKILL.md    # Skill for coding agents
+    agentic-reviewer/SKILL.md # Skill for review agents
 ```
-
-## How It Works
-
-The Dispatcher (`dispatcher.py`) is a stateless Python process invoked every 3 minutes via crontab. Each invocation:
-
-1. Loads `agents.yml` (validates config, expands `${VAR}` env vars)
-2. Validates `.gitignore` contains required entries
-3. Polls GitHub for issues matching each role's `pickup_label`
-4. Calculates available capacity per role (sum of `max_concurrent` minus active lockfiles)
-5. Assigns issues to agents via round-robin rotation
-6. For each issue: creates git worktree, writes `ISSUE.md`, spawns agent CLI subprocess
-7. Processes results: transitions labels, writes state logs, sends notifications
-
-A separate `merge.sh` cronjob (offset by 90s) merges PRs labeled `ready-to-merge`.
 
 ## Label State Machine
 
 ```
-todo → in-progress → pr-opened → reviewing → ready-to-merge → [merged/closed]
+todo → in-progress → pr-opened → reviewing → ready-to-merge → [merged]
                                            → changes-requested → in-progress (retry, max 3)
                                            → human-review-required (after 3 failed attempts)
+                   → agent-error  (agent failed — needs human intervention)
 ```
 
-- `todo`: Human applies when issue is ready for pipeline
-- Labels are the single source of truth (no local DB)
+- `todo` — human applies to trigger pipeline
+- `agent-error` — agent failed (API error, crash, etc.) — human must intervene
 
-## Key Files in Workspace
+## Setup Steps (for AI agent to execute)
 
-When working on an issue, you are in a git worktree at `~/.agent-pipeline/<repo>/workspaces/issue-<N>/`. This is a full repo checkout on branch `agent/issue-<N>`.
+### 1. Copy and configure agents.yml
 
-- `ISSUE.md` — Injected by dispatcher. Contains issue number, title, body, comments. Use the issue number for PR titles: `Fix #<number>: <description>`
-- `AGENTS.md` — This file. Project context for agent CLIs.
-- `CLAUDE.md` — Symlink to AGENTS.md (Claude CLI compatibility).
+```bash
+cp agents.example.yml agents.yml
+```
 
-## Coding Role Guidelines
+Edit `agents.yml`:
+- `pipeline.repo_path` — absolute path to the local clone of the target repo
+- `pipeline.workspace_base` — e.g. `~/.agent-pipeline/<repo-name>/workspaces`
+- `pipeline.state_base` — e.g. `~/.agent-pipeline/<repo-name>/state`
+- `agents[].env.GH_TOKEN` — set `CODER_GH_TOKEN` and `REVIEWER_GH_TOKEN` in `.env`
 
-When implementing an issue:
+### 2. Set up Python environment
 
-1. Read `ISSUE.md` for the issue details and number
-2. Implement the requested changes
-3. Commit, push, and create a PR with title format: `Fix #<issue_number>: <description>`
-4. The closing keyword in the PR title auto-closes the issue on merge
-5. Exit with code 0 on success, non-zero on failure
+```bash
+python3 -m venv .venv
+.venv/bin/pip install pyyaml
+```
 
-## Review Role Guidelines
+### 3. Create .env file
 
-When reviewing a PR:
+```bash
+# .env (gitignored)
+export CODER_GH_TOKEN="ghp_..."       # GitHub account that opens PRs
+export REVIEWER_GH_TOKEN="ghp_..."    # Separate GitHub account that approves PRs
+export TELEGRAM_BOT_TOKEN="..."       # Optional
+export TELEGRAM_CHAT_ID="..."         # Optional
+export DISCORD_WEBHOOK_URL="..."      # Optional
+```
 
-1. Read `ISSUE.md` for context on what the PR should accomplish
-2. Review the code changes in the PR
-3. Either approve or request changes
-4. Exit with code 0 on completion
+### 4. Set up target repo
 
-## Configuration (agents.yml)
+```bash
+source .env
+./scripts/setup-repo.sh <owner/repo>
+```
+
+This creates all 8 pipeline labels and enables squash merge.
+
+### 5. Install skills into agent CLI directories
+
+```bash
+# kiro-cli
+ln -s $(pwd)/skills/agentic-coder ~/.kiro/skills/agentic-coder
+ln -s $(pwd)/skills/agentic-reviewer ~/.kiro/skills/agentic-reviewer
+
+# claude
+ln -s $(pwd)/skills/agentic-coder ~/.claude/skills/agentic-coder
+ln -s $(pwd)/skills/agentic-reviewer ~/.claude/skills/agentic-reviewer
+```
+
+### 6. Add AGENTS.md to target repo
+
+Generate with kiro-cli:
+```bash
+cd /path/to/target/repo
+# run: /code summary inside kiro-cli, save output as AGENTS.md
+```
+
+Or copy a template and edit manually.
+
+### 7. Add .gitignore to target repo
+
+Must contain:
+```
+ISSUE.md
+.kiro/
+.claude/
+.codex/
+.copilot/
+.gemini/
+```
+
+### 8. Test notifications
+
+```bash
+source .env && .venv/bin/python3 scripts/test-notifications.py
+```
+
+### 9. Run manually (recommended before crontab)
+
+```bash
+source .env && .venv/bin/python3 dispatcher.py
+```
+
+### 10. Set up crontab (after manual testing passes)
+
+```bash
+crontab -e
+# paste contents of config/crontab.example (update paths first)
+```
+
+## Correct agents.yml Command Format
 
 ```yaml
-pipeline:
-  repo_path: "/path/to/your/repo"
-  workspace_base: "~/.agent-pipeline/your-repo-name/workspaces"
-  state_base: "~/.agent-pipeline/your-repo-name/state"
-
 agents:
   - name: kiro-cli
     role: coding
-    command: "kiro-cli --resume --agent senior --no-interactive"
+    command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md and AGENTS.md first, then follow the agentic-coder skill to implement, commit, push, and open a PR.'"
     max_concurrent: 2
     cooldown_minutes: 0
+    env:
+      GH_TOKEN: "${CODER_GH_TOKEN}"
 
   - name: claude
     role: review
-    command: "claude --dangerously-skip-permissions -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md then begin.'"
+    command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-5 -p 'You are a code reviewer. Read ISSUE.md and AGENTS.md first, then follow the agentic-reviewer skill to review the PR and approve or request changes.'"
     max_concurrent: 1
     cooldown_minutes: 0
+    env:
+      GH_TOKEN: "${REVIEWER_GH_TOKEN}"
 
 roles:
   coding:
@@ -97,7 +161,7 @@ roles:
   review:
     pickup_label: "pr-opened"
     label_on_start: "reviewing"
-    label_on_done: "ready-to-merge, changes-requested"
+    label_on_done: "ready-to-merge"
 
 notifications:
   telegram:
@@ -107,25 +171,30 @@ notifications:
     webhook_url: "${DISCORD_WEBHOOK_URL}"
 ```
 
-## Dispatcher Modules
+## Troubleshooting (for AI agent)
 
-| Module | Responsibility |
-|--------|---------------|
-| `load_config()` | Parse YAML, expand `${VAR}`, validate fields |
-| `validate_gitignore()` | Check `.gitignore` has required entries |
-| `poll_issues()` | Query GitHub for issues by pickup label |
-| `transition_label()` | Atomic label swap on GitHub issues |
-| `create_workspace()` / `cleanup_workspace()` | Git worktree lifecycle |
-| `write_issue_context()` | Write `ISSUE.md` to worktree |
-| `acquire_lock()` / `release_lock()` | Lockfile concurrency control (`/tmp/agent-<name>-<N>.lock`) |
-| `pick_agent()` | Round-robin agent selection per role |
-| `run_agent()` | Spawn agent CLI subprocess |
-| `write_state_log()` | YAML state log with sequential indexing |
-| `notify()` | Telegram/Discord notifications |
+### Issue stuck in a label state
 
-## State & Observability
+Check state log:
+```bash
+cat ~/.agent-pipeline/<repo>/state/issue-<N>/*.log
+```
 
-- State logs: `~/.agent-pipeline/<repo>/state/issue-<N>/<index>-<state>.log` (YAML)
-- Current state: `~/.agent-pipeline/<repo>/current/issue-<N>` (symlinks)
-- Runtime logs: `/tmp/agentic-loop.log`, `/tmp/agentic-loop.error.log`
-- Attempt count: derived from `*-changes-requested.log` file count per issue
+To re-enter pipeline, change label manually:
+```bash
+source .env
+GH_TOKEN=$CODER_GH_TOKEN gh issue edit <N> --remove-label "<current>" --add-label "todo" --repo <owner/repo>
+```
+
+### agent-error label
+
+Agent failed (API error, crash, quota exceeded). Read the state log for the error.
+Fix the underlying issue (e.g. switch model, check token), then reset label to `todo` or `pr-opened`.
+
+### Observability
+
+```bash
+tail -f /tmp/agentic-loop.log          # live dispatcher log
+./scripts/status.sh                    # current state of all issues
+ls ~/.agent-pipeline/<repo>/state/issue-<N>/  # full history of one issue
+```
