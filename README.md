@@ -166,6 +166,18 @@ Also install the [`gh-cli`](https://skills.sh/github/awesome-copilot/gh-cli) ski
 gh skills install github/awesome-copilot/gh-cli   # or copy manually to your skills dir
 ```
 
+> Skills load automatically when the prompt matches the skill's `description`. For this to work, skills must be declared in the agent's config file:
+>
+> **kiro-cli** — add to `~/.kiro/agents/<agent-name>.md`:
+> ```markdown
+> skills:
+>   - agentic-coder      # or agentic-reviewer for review role
+>   - conventional-commit
+> ```
+> **claude** — add to your agent profile's `skills:` list similarly.
+>
+> If skills don't auto-load, see the troubleshooting section in `AGENTS.md`.
+
 **4. Add `AGENTS.md` to your target repo**
 
 `AGENTS.md` is the project context file that agents read before doing any work. The easiest way to generate it is with kiro-cli's `/code summary` command — it analyses your codebase and produces a concise summary of the architecture, conventions, and key files:
