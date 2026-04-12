@@ -127,6 +127,20 @@ python3 -m venv .venv
 .venv/bin/pip install pyyaml
 ```
 
+**5. Create `.env` for credentials**
+
+crontab does not load `~/.zshrc`, so environment variables must be in a `.env` file:
+```bash
+# .env (already in .gitignore)
+export CODER_GH_TOKEN="ghp_..."
+export REVIEWER_GH_TOKEN="ghp_..."
+export TELEGRAM_BOT_TOKEN="..."
+export TELEGRAM_CHAT_ID="..."
+export DISCORD_WEBHOOK_URL="..."
+```
+
+For manual runs: `source .env && .venv/bin/python3 dispatcher.py`
+
 **3. Install agent skills**
 
 Copy or symlink the skills into your agent CLI's skills directory so agents know how to behave as coder or reviewer:
