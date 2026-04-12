@@ -11,7 +11,7 @@ if [[ ! -f "$AGENTS_YML" ]]; then
   exit 1
 fi
 
-REPO_PATH=$(python3 -c "import yaml; c=yaml.safe_load(open('$AGENTS_YML')); print(c['pipeline']['repo_path'])")
+REPO_PATH=$(grep 'repo_path:' "$AGENTS_YML" | head -1 | sed 's/.*repo_path: *"\(.*\)"/\1/')
 
 cd "$REPO_PATH"
 
