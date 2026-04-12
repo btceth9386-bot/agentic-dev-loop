@@ -120,6 +120,13 @@ claude --version
 gh auth status
 ```
 
+**4. Set up Python environment**
+```bash
+cd /path/to/agentic-dev-loop
+python3 -m venv .venv
+.venv/bin/pip install pyyaml
+```
+
 **3. Install agent skills**
 
 Copy or symlink the skills into your agent CLI's skills directory so agents know how to behave as coder or reviewer:
