@@ -101,7 +101,19 @@ cp agents.example.yml agents.yml
 # Edit agents.yml: set repo_path, workspace_base, state_base, and agent commands
 ```
 
-**2. Install agent CLIs**
+**2. Set up your target repo**
+
+Run the setup script to create all required labels and configure merge settings:
+```bash
+./scripts/setup-repo.sh <owner/repo>
+# Example: ./scripts/setup-repo.sh myorg/my-project
+```
+
+This creates the 7 pipeline labels and sets the repo to squash-merge only (matching `merge.sh`).
+
+**3. Install agent CLIs**
+
+Make sure the agent CLIs you configured are installed and authenticated:
 ```bash
 kiro-cli --version
 claude --version
