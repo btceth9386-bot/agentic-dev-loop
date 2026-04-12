@@ -1,5 +1,5 @@
 #!/bin/bash
-# merge.sh — auto-merge PRs labeled ready-to-merge
+# merge.sh — auto-merge PRs for issues labeled ready-to-merge
 
 set -euo pipefail
 
@@ -20,9 +20,14 @@ cd "$REPO_PATH"
 
 export GH_TOKEN="${CODER_GH_TOKEN:?CODER_GH_TOKEN is not set}"
 
-APPROVED_PRS=$(gh pr list --label "ready-to-merge" --json number --jq '.[].number')
+ISSUE_NUMBERS=$(gh issue list --label "ready-to-merge" --json number --jq '.[].number')
 
-for PR in $APPROVED_PRS; do
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Merging PR #$PR"
+for ISSUE in $ISSUE_NUMBERS; do
+  PR=$(gh pr list --head "agent/issue-${ISSUE}" --json number --jq '.[0].number')
+  if [[ -z "$PR" || "$PR" == "null" ]]; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) No PR found for issue #${ISSUE}, skipping"
+    continue
+  fi
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Merging PR #${PR} for issue #${ISSUE}"
   gh pr merge "$PR" --squash --auto
 done
