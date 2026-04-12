@@ -241,6 +241,8 @@ agents:
 
 The `env` map is merged into the subprocess environment at spawn time, overriding any existing variables with the same name. All values support `${VAR_NAME}` expansion.
 
+> ⚠️ The reviewer GitHub account must be added as a **collaborator with Write access** to the target repo, otherwise `gh pr review` will fail. Go to repo **Settings → Collaborators → Add people**.
+
 ## Observability
 
 ```bash

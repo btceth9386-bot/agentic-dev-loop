@@ -80,6 +80,10 @@ source .env
 
 This creates all 8 pipeline labels and enables squash merge.
 
+> ⚠️ **Important**: If coder and reviewer use different GitHub accounts, the reviewer account must be added as a collaborator with **Write** access to the target repo. Otherwise `gh pr review` will fail with a permission error.
+>
+> Go to: repo **Settings → Collaborators → Add people** → add the reviewer account.
+
 ### 5. Install skills into agent CLI directories
 
 ```bash
