@@ -27,6 +27,7 @@ create_label "reviewing"              "f9d0c4" "Review agent working"
 create_label "ready-to-merge"         "0e8a16" "Approved, queued for merge"
 create_label "changes-requested"      "e11d48" "Review requested changes"
 create_label "human-review-required"  "b60205" "Escalated — needs human"
+create_label "agent-error"            "6e40c9" "Agent failed — needs human intervention"
 
 echo "Labels created."
 

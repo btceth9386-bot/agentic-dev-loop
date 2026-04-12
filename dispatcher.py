@@ -94,7 +94,7 @@ def validate_gitignore(repo_path):
 
 STATE_LABELS = {
     "todo", "in-progress", "pr-opened", "reviewing",
-    "ready-to-merge", "changes-requested", "human-review-required",
+    "ready-to-merge", "changes-requested", "human-review-required", "agent-error",
 }
 
 
@@ -449,7 +449,7 @@ def write_state_log(config, issue_number, agent_name, role, prev_state, curr_sta
 # Notifications
 # ---------------------------------------------------------------------------
 
-NOTIFY_ON = {"changes-requested", "ready-to-merge", "human-review-required", "in-progress", "pr-opened"}
+NOTIFY_ON = {"changes-requested", "ready-to-merge", "human-review-required", "in-progress", "pr-opened", "agent-error"}
 
 
 def notify(config, message, state=None):
@@ -544,9 +544,11 @@ def process_issue(config, issue, role_name, role_cfg):
                 transition_label(issue_number, label_on_start, label_on_done, repo_path)
                 notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
             else:
-                curr_state = "failed"
-                log.error("Coding agent failed and no PR found for #%s", issue_number)
-                notify(config, f"❌ Coding agent failed for issue #{issue_number}", "failed")
+                curr_state = "agent-error"
+                transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                error_summary = (result.stderr or result.stdout or "no output")[:500]
+                log.error("Coding agent failed for #%s: %s", issue_number, error_summary)
+                notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
 
         elif role_name == "review":
             if success and pr_is_approved(issue_number, repo_path):
@@ -555,8 +557,11 @@ def process_issue(config, issue, role_name, role_cfg):
                 notify(config, f"✅ PR approved for issue #{issue_number}, ready to merge", "ready-to-merge")
             else:
                 if not pr_has_review_comments(issue_number, repo_path):
-                    log.warning("Review agent exit non-zero but no review comments found for #%s, skipping transition", issue_number)
-                    curr_state = label_on_start
+                    curr_state = "agent-error"
+                    transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                    error_summary = (result.stderr or result.stdout or "no output")[:500]
+                    log.warning("Review agent failed with no review comments for #%s: %s", issue_number, error_summary)
+                    notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
                 else:
                     curr_state = "changes-requested"
                     transition_label(issue_number, label_on_start, "changes-requested", repo_path)

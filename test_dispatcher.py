@@ -456,7 +456,7 @@ def test_coding_fails_when_no_pr_and_nonzero(tmp_path, base_config):
             d.process_issue(base_config, _make_issue(), "coding", base_config["roles"]["coding"])
     state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
     log = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
-    assert log["curr_state"] == "failed"
+    assert log["curr_state"] == "agent-error"
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +487,9 @@ def test_review_skips_transition_when_no_comments(tmp_path, base_config, caplog)
         with patch.object(d, "LOCK_DIR", tmp_path):
             with caplog.at_level(logging.WARNING):
                 d.process_issue(base_config, _make_issue(), "review", base_config["roles"]["review"])
-    assert "no review comments" in caplog.text
+    state_dir = Path(base_config["pipeline"]["state_base"]) / "issue-42"
+    log_content = yaml.safe_load(list(state_dir.glob("*.log"))[0].read_text())
+    assert log_content["curr_state"] == "agent-error"
 
 
 # ---------------------------------------------------------------------------
