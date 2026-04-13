@@ -1,5 +1,5 @@
 #!/bin/bash
-# status.sh — pipeline monitoring dashboard
+# monitor.sh — pipeline monitoring dashboard
 # Designed to be run by AI agents or humans to get a quick overview.
 # Output is plain text, easy to parse programmatically.
 

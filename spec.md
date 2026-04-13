@@ -483,7 +483,7 @@ agentic-loop/
     spec.md              ← this file
   scripts/
     rotate-role.sh       ← CLI helper to swap agent roles
-    status.sh            ← print current pipeline state
+    monitor.sh            ← pipeline monitoring dashboard
 ```
 
 ---

@@ -268,7 +268,7 @@ The `env` map is merged into the subprocess environment at spawn time, overridin
 tail -f /tmp/agentic-loop.log
 
 # Current state of all issues
-./scripts/status.sh
+./scripts/monitor.sh
 
 # Full history of one issue
 ls ~/.agent-pipeline/<repo>/state/issue-42/

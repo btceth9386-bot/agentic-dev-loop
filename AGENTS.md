@@ -20,7 +20,7 @@ agentic-dev-loop/
   scripts/
     setup-repo.sh        # Create GitHub labels and configure target repo
     rotate-role.sh       # Swap an agent's role in agents.yml
-    status.sh            # Print current pipeline state
+    monitor.sh            # Print current pipeline state
     test-notifications.py # Test Telegram/Discord notifications
   skills/
     agentic-coder/SKILL.md    # Skill for coding agents
@@ -231,6 +231,6 @@ Fix the underlying issue (e.g. switch model, check token), then reset label to `
 
 ```bash
 tail -f /tmp/agentic-loop.log          # live dispatcher log
-./scripts/status.sh                    # current state of all issues
+./scripts/monitor.sh                    # current state of all issues
 ls ~/.agent-pipeline/<repo>/state/issue-<N>/  # full history of one issue
 ```
