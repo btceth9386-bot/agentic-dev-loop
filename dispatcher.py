@@ -110,7 +110,16 @@ def _gh(args, repo_path, retries=2, **kwargs):
         if result.returncode == 0:
             return result
         stderr = result.stderr or ""
-        if any(s in stderr for s in ("rate limit", "502", "503", "504", "INTERNAL_ERROR")):
+        if "rate limit" in stderr.lower():
+            # Touch cooldown markers for all agents so dispatcher backs off
+            for p in LOCK_DIR.glob("agent-*.cooldown"):
+                pass  # existing cooldowns stay
+            log.warning("GitHub rate limit hit, backing off")
+            if attempt < retries:
+                time.sleep(10 * (attempt + 1))
+                continue
+            return result
+        if any(s in stderr for s in ("502", "503", "504", "INTERNAL_ERROR")):
             if attempt < retries:
                 log.warning("gh transient error (attempt %d/%d): %s", attempt + 1, retries + 1, stderr[:200])
                 time.sleep(3 * (attempt + 1))
@@ -599,6 +608,31 @@ def process_issue(config, issue, role_name, role_cfg):
                         notify(config, f"🔀 PR #{pr_num} has merge conflicts — changes requested on issue #{issue_number}", "changes-requested")
                         write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "changes-requested", attempt)
                         return
+
+                # Check PR author != reviewer to avoid self-approval error
+                author_result = _gh(["pr", "view", str(pr_num), "--json", "author"], repo_path)
+                if author_result.returncode == 0:
+                    pr_author = _json.loads(author_result.stdout).get("author", {}).get("login", "")
+                    # Check who the reviewer token belongs to
+                    reviewer_env = {}
+                    for a in config.get("agents", []):
+                        if a["role"] == "review":
+                            reviewer_env = a.get("env", {})
+                            break
+                    reviewer_token = reviewer_env.get("GH_TOKEN", "")
+                    if reviewer_token:
+                        whoami = subprocess.run(
+                            ["gh", "api", "user", "--jq", ".login"],
+                            capture_output=True, text=True,
+                            env={**os.environ, "GH_TOKEN": reviewer_token},
+                        )
+                        reviewer_login = whoami.stdout.strip()
+                        if reviewer_login and reviewer_login == pr_author:
+                            log.error("PR #%s author (%s) == reviewer token (%s), cannot self-approve", pr_num, pr_author, reviewer_login)
+                            transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                            notify(config, f"🚨 Issue #{issue_number}: PR author and reviewer are the same account ({pr_author}). Use a different REVIEWER_GH_TOKEN.", "agent-error")
+                            write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "agent-error", attempt)
+                            return
 
     # Pick agent
     agent = pick_agent(config, role_name)
