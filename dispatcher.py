@@ -170,27 +170,14 @@ def fetch_pr_context(issue_number, repo_path):
     if not prs:
         return None
     pr = prs[0]
-    detail = _gh(["pr", "view", str(pr["number"]), "--json", "number,url,title,reviews,comments"], repo_path)
-    if detail.returncode != 0:
-        return None
-    d = json.loads(detail.stdout)
     lines = [
         "---",
-        f"# Pull Request #{d['number']}",
+        f"# Pull Request #{pr['number']}",
         "## URL",
-        d.get("url", ""),
+        pr.get("url", ""),
         "## Title",
-        d.get("title", ""),
-        "## Review Comments",
+        pr.get("title", ""),
     ]
-    for review in d.get("reviews", []):
-        author = review.get("author", {}).get("login", "unknown")
-        body = review.get("body", "").strip()
-        if body:
-            lines += [f"### Review by {author}", "", body, ""]
-    for comment in d.get("comments", []):
-        author = comment.get("author", {}).get("login", "unknown")
-        lines += [f"### Comment by {author}", "", comment.get("body", ""), ""]
     return "\n".join(lines)
 
 
@@ -232,7 +219,7 @@ def dismiss_stale_reviews(issue_number, repo_path):
             log.info("Dismissed review %s on PR #%s", review['id'], pr_number)
 
 
-
+def pr_exists(issue_number, repo_path):
     """Return True if a PR exists for agent/issue-<N> branch."""
     import json
     result = _gh(
