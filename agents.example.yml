@@ -32,7 +32,9 @@ agents:
 
 roles:
   coding:
-    pickup_label: "todo"
+    pickup_label:
+      - "todo"
+      - "changes-requested"
     label_on_start: "in-progress"
     label_on_done: "pr-opened"
   review:
