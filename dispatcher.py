@@ -564,6 +564,29 @@ def process_issue(config, issue, role_name, role_cfg):
     if role_name == "review":
         dismiss_stale_reviews(issue_number, repo_path)
 
+        # Block review if PR has merge conflicts
+        import json as _json
+        pr_result = _gh(
+            ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number", "--limit", "1"],
+            repo_path,
+        )
+        if pr_result.returncode == 0:
+            prs = _json.loads(pr_result.stdout or "[]")
+            if prs:
+                pr_num = prs[0]["number"]
+                merge_result = _gh(["pr", "view", str(pr_num), "--json", "mergeable"], repo_path)
+                if merge_result.returncode == 0:
+                    mergeable = _json.loads(merge_result.stdout).get("mergeable", "")
+                    if mergeable == "CONFLICTING":
+                        log.info("PR #%s has merge conflicts, requesting changes without agent", pr_num)
+                        _gh(["pr", "review", str(pr_num), "--request-changes",
+                             "--body", "This PR has merge conflicts with the base branch. Please rebase or merge main and resolve all conflicts before this can be reviewed."],
+                            repo_path)
+                        transition_label(issue_number, label_on_start, "changes-requested", repo_path)
+                        notify(config, f"🔀 PR #{pr_num} has merge conflicts — changes requested on issue #{issue_number}", "changes-requested")
+                        write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "changes-requested", attempt)
+                        return
+
     # Pick agent
     agent = pick_agent(config, role_name)
     if not agent:
