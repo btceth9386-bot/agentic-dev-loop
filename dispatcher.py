@@ -726,6 +726,12 @@ def main():
     config = load_config()
     repo_path = config["pipeline"]["repo_path"]
 
+    # Ensure GH_TOKEN is set for dispatcher's own gh calls (polling, labels, etc.)
+    if not os.environ.get("GH_TOKEN"):
+        coder_token = os.environ.get("CODER_GH_TOKEN", "")
+        if coder_token:
+            os.environ["GH_TOKEN"] = coder_token
+
     try:
         validate_gitignore(repo_path)
     except Exception as e:
