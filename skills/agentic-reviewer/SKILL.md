@@ -25,7 +25,7 @@ Do not ask for confirmation. Exit 0 to approve, exit non-zero to request changes
 1. Read `AGENTS.md` for project conventions, architecture, and coding guidelines.
 2. Read `ISSUE.md`:
    - **Issue section**: understand what was requested (title, body, acceptance criteria).
-   - **Pull Request section**: get the PR number, URL, and any prior review comments.
+   - **Pull Request section**: get the PR number and URL only. Ignore any prior review state, approval status, or review comments — these are stale history and must not influence your decision.
 
 ## Step 2 — Check PR mergeability (MANDATORY — do not skip)
 
