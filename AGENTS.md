@@ -62,9 +62,22 @@ python3 -m venv .venv
 
 ### 3. Create .env file
 
+Copy the example and fill in your values:
+```bash
+cp .env.example .env
+```
+
+Three GitHub tokens are required (see `.env.example` for details):
+
+| Token | Used by | Minimum GitHub scopes | Notes |
+|-------|---------|----------------------|-------|
+| `DISPATCHER_GH_TOKEN` | dispatcher.py | `repo` (issues r/w, PRs r/w) | Can be same as CODER or REVIEWER |
+| `CODER_GH_TOKEN` | coding agents | `repo` (code r/w, PRs r/w, issues r) | Account that opens PRs |
+| `REVIEWER_GH_TOKEN` | review agents | `repo` (PRs r/w) | Must be a **different** account from coder |
+
 ```bash
 # .env (gitignored)
-export DISPATCHER_GH_TOKEN="ghp_..."  # Token for dispatcher polling/labels (can be same as CODER or REVIEWER)
+export DISPATCHER_GH_TOKEN="ghp_..."  # Dispatcher polling/labels (can be same as CODER or REVIEWER)
 export CODER_GH_TOKEN="ghp_..."       # GitHub account that opens PRs
 export REVIEWER_GH_TOKEN="ghp_..."    # Separate GitHub account that approves PRs
 export TELEGRAM_BOT_TOKEN="..."       # Optional

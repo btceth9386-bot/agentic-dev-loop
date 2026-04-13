@@ -131,13 +131,19 @@ python3 -m venv .venv
 
 crontab does not load `~/.zshrc`, so environment variables must be in a `.env` file:
 ```bash
-# .env (already in .gitignore)
-export CODER_GH_TOKEN="ghp_..."
-export REVIEWER_GH_TOKEN="ghp_..."
-export TELEGRAM_BOT_TOKEN="..."
-export TELEGRAM_CHAT_ID="..."
-export DISCORD_WEBHOOK_URL="..."
+cp .env.example .env
+# Fill in your token values
 ```
+
+Three GitHub tokens are required:
+
+| Token | Used by | Minimum GitHub scopes | Notes |
+|-------|---------|----------------------|-------|
+| `DISPATCHER_GH_TOKEN` | dispatcher.py | `repo` (issues r/w, PRs r/w) | Can be same as CODER or REVIEWER |
+| `CODER_GH_TOKEN` | coding agents | `repo` (code r/w, PRs r/w, issues r) | Account that opens PRs |
+| `REVIEWER_GH_TOKEN` | review agents | `repo` (PRs r/w) | Must be a **different** account from coder |
+
+> ⚠️ `REVIEWER_GH_TOKEN` must belong to a different GitHub account than `CODER_GH_TOKEN`. GitHub does not allow a user to approve their own PR.
 
 For manual runs: `source .env && .venv/bin/python3 dispatcher.py`
 
