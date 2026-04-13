@@ -203,16 +203,29 @@ def dismiss_stale_reviews(issue_number, repo_path):
     if not prs:
         return
     pr_number = prs[0]["number"]
-    detail = _gh(["pr", "view", str(pr_number), "--json", "reviews"], repo_path)
-    if detail.returncode != 0:
+
+    # Get repo owner/name from remote URL
+    remote = subprocess.run(["git", "remote", "get-url", "origin"], cwd=repo_path, capture_output=True, text=True)
+    remote_url = remote.stdout.strip()
+    # Parse owner/repo from git@github.com:owner/repo.git or https://github.com/owner/repo.git
+    import re
+    m = re.search(r'[:/]([^/]+/[^/]+?)(?:\.git)?$', remote_url)
+    if not m:
         return
-    for review in json.loads(detail.stdout).get("reviews", []):
+    owner_repo = m.group(1)
+
+    # Use REST API to get numeric review IDs
+    reviews_result = _gh(["api", f"repos/{owner_repo}/pulls/{pr_number}/reviews"], repo_path)
+    if reviews_result.returncode != 0:
+        return
+    for review in json.loads(reviews_result.stdout or "[]"):
         if review.get("state") == "APPROVED":
             _gh(
-                ["api", f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/reviews/{review['id']}/dismissals",
+                ["api", f"repos/{owner_repo}/pulls/{pr_number}/reviews/{review['id']}/dismissals",
                  "--method", "PUT", "-f", "message=Dismissed for re-review"],
                 repo_path,
             )
+            log.info("Dismissed review %s on PR #%s", review['id'], pr_number)
 
 
 
