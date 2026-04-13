@@ -669,6 +669,24 @@ def cleanup_merged_workspaces(config):
             notify(config, f"🧹 Issue #{issue_number} workspace cleaned up after merge", "ready-to-merge")
 
 
+def requeue_changes_requested(config):
+    """Move changes-requested issues back to todo for coder retry, or escalate after 3 attempts."""
+    import json
+    repo_path = config["pipeline"]["repo_path"]
+    issues = poll_issues("changes-requested", repo_path)
+    for issue in issues:
+        issue_number = issue["number"]
+        attempt = get_attempt_count(config, issue_number)
+        if attempt >= 3:
+            transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
+            cleanup_workspace(config, issue_number)
+            notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
+            log.info("Issue #%s escalated to human-review-required after %d attempts", issue_number, attempt)
+        else:
+            transition_label(issue_number, "changes-requested", "todo", repo_path)
+            log.info("Issue #%s requeued to todo for coder retry (attempt %d)", issue_number, attempt)
+
+
 def main():
     config = load_config()
     repo_path = config["pipeline"]["repo_path"]
@@ -682,6 +700,7 @@ def main():
     roles = config.get("roles", {})
 
     cleanup_merged_workspaces(config)
+    requeue_changes_requested(config)
 
     for role_name, role_cfg in roles.items():
         capacity = calculate_role_capacity(config, role_name)
