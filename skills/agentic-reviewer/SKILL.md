@@ -23,7 +23,21 @@ Do not ask for confirmation. Exit 0 to approve, exit non-zero to request changes
    - **Issue section**: understand what was requested (title, body, acceptance criteria).
    - **Pull Request section**: get the PR number, URL, and any prior review comments.
 
-## Step 2 — Review the diff
+## Step 2 — Check PR mergeability
+
+Before reviewing the diff, check if the PR has merge conflicts:
+```
+gh pr view <pr_number> --json mergeable,mergeStateStatus
+```
+
+If `mergeable` is `CONFLICTING`:
+- Immediately request changes:
+```
+gh pr review <pr_number> --request-changes --body "This PR has merge conflicts with the base branch. Please rebase or merge main and resolve all conflicts before this can be reviewed."
+```
+Then exit non-zero.
+
+## Step 3 — Review the diff
 
 Fetch and examine the PR diff:
 ```
@@ -37,13 +51,13 @@ For each changed file, verify:
 - Is error handling present and appropriate?
 - Are there no unrelated changes bundled in?
 
-## Step 3 — Review the tests
+## Step 4 — Review the tests
 
 1. Check that new or updated tests cover the changed behaviour.
 2. Verify tests follow existing conventions (framework, naming, location).
 3. Confirm the test logic actually validates the requirement — not just that it passes.
 
-## Step 4 — Acceptance criteria check
+## Step 5 — Acceptance criteria check
 
 Go through each acceptance criterion from the issue body one by one:
 - [ ] Criterion 1 — met / not met
@@ -52,7 +66,7 @@ Go through each acceptance criterion from the issue body one by one:
 
 All criteria must be met for approval.
 
-## Step 5 — Decision
+## Step 6 — Decision
 
 ### Approve
 If all of the following are true:
