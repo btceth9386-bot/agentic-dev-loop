@@ -29,5 +29,5 @@ for ISSUE in $ISSUE_NUMBERS; do
     continue
   fi
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Merging PR #${PR} for issue #${ISSUE}"
-  gh pr merge "$PR" --squash --auto
+  gh pr merge "$PR" --squash --delete-branch
 done
