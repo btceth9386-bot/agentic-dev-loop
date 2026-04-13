@@ -190,7 +190,32 @@ def fetch_pr_context(issue_number, repo_path):
     return "\n".join(lines)
 
 
-def pr_exists(issue_number, repo_path):
+def dismiss_stale_reviews(issue_number, repo_path):
+    """Dismiss all approved reviews on the PR for agent/issue-<N> so reviewer starts fresh."""
+    import json
+    result = _gh(
+        ["pr", "list", "--head", f"agent/issue-{issue_number}", "--json", "number", "--limit", "1"],
+        repo_path,
+    )
+    if result.returncode != 0:
+        return
+    prs = json.loads(result.stdout or "[]")
+    if not prs:
+        return
+    pr_number = prs[0]["number"]
+    detail = _gh(["pr", "view", str(pr_number), "--json", "reviews"], repo_path)
+    if detail.returncode != 0:
+        return
+    for review in json.loads(detail.stdout).get("reviews", []):
+        if review.get("state") == "APPROVED":
+            _gh(
+                ["api", f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/reviews/{review['id']}/dismissals",
+                 "--method", "PUT", "-f", "message=Dismissed for re-review"],
+                repo_path,
+            )
+
+
+
     """Return True if a PR exists for agent/issue-<N> branch."""
     import json
     result = _gh(
@@ -521,6 +546,10 @@ def process_issue(config, issue, role_name, role_cfg):
         write_issue_context(config, issue_number, context, pr_context)
     except Exception as e:
         log.error("Failed to write ISSUE.md for #%s: %s", issue_number, e)
+
+    # Dismiss stale reviews so reviewer agent starts fresh
+    if role_name == "review":
+        dismiss_stale_reviews(issue_number, repo_path)
 
     # Pick agent
     agent = pick_agent(config, role_name)
