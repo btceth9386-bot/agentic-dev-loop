@@ -16,6 +16,10 @@ the pull request described in `ISSUE.md` against the original issue requirements
 project conventions, then either approve or request changes — autonomously.
 Do not ask for confirmation. Exit 0 to approve, exit non-zero to request changes.
 
+> ⚠️ **IMPORTANT**: You MUST execute every step below in order, every time.
+> Prior review history, existing approvals, and unchanged commits are IRRELEVANT.
+> Do NOT short-circuit. Do NOT declare "no action needed". Always produce a new review decision.
+
 ## Step 1 — Read context
 
 1. Read `AGENTS.md` for project conventions, architecture, and coding guidelines.
@@ -23,19 +27,18 @@ Do not ask for confirmation. Exit 0 to approve, exit non-zero to request changes
    - **Issue section**: understand what was requested (title, body, acceptance criteria).
    - **Pull Request section**: get the PR number, URL, and any prior review comments.
 
-## Step 2 — Check PR mergeability
+## Step 2 — Check PR mergeability (MANDATORY — do not skip)
 
-Before reviewing the diff, check if the PR has merge conflicts:
+Run this command now:
 ```
 gh pr view <pr_number> --json mergeable,mergeStateStatus
 ```
 
-If `mergeable` is `CONFLICTING`:
-- Immediately request changes:
+If `mergeable` is `CONFLICTING`, you MUST request changes immediately:
 ```
 gh pr review <pr_number> --request-changes --body "This PR has merge conflicts with the base branch. Please rebase or merge main and resolve all conflicts before this can be reviewed."
 ```
-Then exit non-zero.
+Then exit non-zero. Do not proceed to Step 3.
 
 ## Step 3 — Review the diff
 
