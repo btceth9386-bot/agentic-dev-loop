@@ -419,6 +419,8 @@ def _patch_process_deps(tmp_path, base_config, agent_exit=0, pr_exists=True, pr_
     stack.enter_context(patch("dispatcher.fetch_issue_context", return_value="# Issue"))
     stack.enter_context(patch("dispatcher.fetch_pr_context", return_value=None))
     stack.enter_context(patch("dispatcher.write_issue_context"))
+    stack.enter_context(patch("dispatcher.dismiss_stale_reviews"))
+    stack.enter_context(patch("dispatcher._gh", return_value=MagicMock(returncode=1, stdout="", stderr="")))
     stack.enter_context(patch("dispatcher.post_assignment_comment"))
     stack.enter_context(patch("dispatcher.notify"))
     stack.enter_context(patch("dispatcher.pr_exists", return_value=pr_exists))
@@ -525,17 +527,11 @@ def test_fetch_pr_context_no_pr():
 
 def test_fetch_pr_context_with_pr():
     pr_list = [{"number": 7, "url": "https://github.com/x/y/pull/7", "title": "Fix #42"}]
-    pr_detail = {
-        "number": 7, "url": "https://github.com/x/y/pull/7", "title": "Fix #42",
-        "reviews": [{"author": {"login": "bob"}, "body": "Looks good"}],
-        "comments": [],
-    }
-    responses = [_mock_run(json.dumps(pr_list)), _mock_run(json.dumps(pr_detail))]
-    with patch("dispatcher.subprocess.run", side_effect=responses):
+    with patch("dispatcher.subprocess.run", return_value=_mock_run(json.dumps(pr_list))):
         result = d.fetch_pr_context(42, "/repo")
     assert "# Pull Request #7" in result
     assert "Fix #42" in result
-    assert "Looks good" in result
+    assert "https://github.com/x/y/pull/7" in result
 
 
 def test_fetch_pr_context_gh_failure():
