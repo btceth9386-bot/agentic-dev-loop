@@ -541,6 +541,12 @@ def process_issue(config, issue, role_name, role_cfg):
     label_on_done = role_cfg["label_on_done"]
     repo_path = config["pipeline"]["repo_path"]
 
+    # Resolve actual label on the issue when pickup_label is a list
+    if isinstance(pickup_label, list):
+        issue_labels = {lbl["name"] for lbl in issue.get("labels", [])}
+        matched = issue_labels & set(pickup_label)
+        pickup_label = matched.pop() if matched else pickup_label[0]
+
     log.info("Picking up issue #%s for role '%s'", issue_number, role_name)
 
     # Transition label to in-progress/reviewing
