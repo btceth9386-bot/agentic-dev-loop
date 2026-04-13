@@ -6,6 +6,11 @@ set -euo pipefail
 
 AGENT_NAME="${1:?Usage: $0 <agent-name> <new-role>}"
 NEW_ROLE="${2:?Usage: $0 <agent-name> <new-role>}"
+
+if [[ "$NEW_ROLE" != "coding" && "$NEW_ROLE" != "review" ]]; then
+  echo "ERROR: role must be 'coding' or 'review', got '$NEW_ROLE'" >&2
+  exit 1
+fi
 AGENTS_YML="$(dirname "$0")/../agents.yml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${SCRIPT_DIR}/.venv/bin/python3"
