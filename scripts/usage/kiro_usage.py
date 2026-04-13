@@ -54,7 +54,8 @@ def parse_usage_screen(screen_text: str) -> Dict[str, Any]:
         result["covered_used"] = float(m.group(1))
         result["covered_limit"] = float(m.group(2))
 
-    # 只抓進度條旁 / Credits 區塊之後的百分比，避免抓到 prompt 上的 context 百分比 (例如 "1% >")
+    # Only match the percent after the Credits block / progress bar,
+    # to avoid capturing the context percent on the prompt (e.g. "1% >").
     m = re.search(r"covered in plan\s*\)[\s\S]*?\b([0-9]{1,3})%", screen_text, re.IGNORECASE)
     if not m:
         m = re.search(r"█\s*([0-9]{1,3})%", screen_text)
@@ -87,7 +88,7 @@ def parse_usage_screen(screen_text: str) -> Dict[str, Any]:
 
 def _drain_until(child, raw: bytes, needle: str, timeout: float,
                  columns: int = 160, rows: int = 60) -> bytes:
-    """讀取 child 輸出直到 render 後出現 needle，或 timeout。"""
+    """Read child output until `needle` appears in the rendered screen, or timeout."""
     end_time = time.time() + timeout
     while time.time() < end_time:
         try:
@@ -96,7 +97,7 @@ def _drain_until(child, raw: bytes, needle: str, timeout: float,
         except Exception:
             pass
         if needle in render_terminal(raw, columns=columns, rows=rows):
-            # 再多抓一點，確保整個區塊渲染完成
+            # Drain a bit more to make sure the whole block is rendered.
             extra_end = time.time() + 1.0
             while time.time() < extra_end:
                 try:
@@ -112,25 +113,26 @@ def run_kiro_usage() -> Dict[str, Any]:
 
     child = pexpect.spawn(
         cmd,
-        encoding=None,     # 重要：保留 raw bytes
+        encoding=None,     # Important: keep raw bytes
         timeout=30,
         dimensions=(60, 160),  # rows, cols
         env=os.environ.copy(),
     )
 
-    # 等 CLI 初始化 —— poll 等 prompt ("% >") 出現
+    # Wait for CLI init -- poll until the prompt ("% >") appears.
     raw = _drain_until(child, b"", "% >", timeout=15)
 
-    # 送 /usage (kiro-cli 的 TUI 需要 \r，不是 \n；sendline 會送 \n 導致指令不會被送出)
+    # Send /usage. The kiro-cli TUI requires \r, not \n;
+    # sendline() sends \n, which means the command is typed but never submitted.
     child.send(b"/usage\r")
 
-    # Poll 等 usage 畫面渲染出來
+    # Poll until the usage screen is rendered.
     raw = _drain_until(child, raw, "Estimated Usage", timeout=15)
 
     rendered = render_terminal(raw, columns=160, rows=60)
     parsed = parse_usage_screen(rendered)
 
-    # 離開
+    # Exit
     try:
         child.send(b"/exit\r")
         time.sleep(0.5)
