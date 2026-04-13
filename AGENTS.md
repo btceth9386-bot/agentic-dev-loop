@@ -64,6 +64,7 @@ python3 -m venv .venv
 
 ```bash
 # .env (gitignored)
+export DISPATCHER_GH_TOKEN="ghp_..."  # Token for dispatcher polling/labels (can be same as CODER or REVIEWER)
 export CODER_GH_TOKEN="ghp_..."       # GitHub account that opens PRs
 export REVIEWER_GH_TOKEN="ghp_..."    # Separate GitHub account that approves PRs
 export TELEGRAM_BOT_TOKEN="..."       # Optional
