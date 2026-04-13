@@ -98,14 +98,25 @@ STATE_LABELS = {
 }
 
 
-def _gh(args, repo_path, **kwargs):
-    return subprocess.run(
-        ["gh"] + args,
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-        **kwargs,
-    )
+def _gh(args, repo_path, retries=2, **kwargs):
+    for attempt in range(retries + 1):
+        result = subprocess.run(
+            ["gh"] + args,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            **kwargs,
+        )
+        if result.returncode == 0:
+            return result
+        stderr = result.stderr or ""
+        if any(s in stderr for s in ("rate limit", "502", "503", "504", "INTERNAL_ERROR")):
+            if attempt < retries:
+                log.warning("gh transient error (attempt %d/%d): %s", attempt + 1, retries + 1, stderr[:200])
+                time.sleep(3 * (attempt + 1))
+                continue
+        return result
+    return result
 
 
 def poll_issues(label, repo_path):
@@ -574,6 +585,11 @@ def process_issue(config, issue, role_name, role_cfg):
                 merge_result = _gh(["pr", "view", str(pr_num), "--json", "mergeable"], repo_path)
                 if merge_result.returncode == 0:
                     mergeable = _json.loads(merge_result.stdout).get("mergeable", "")
+                    if mergeable == "UNKNOWN":
+                        time.sleep(5)
+                        merge_result = _gh(["pr", "view", str(pr_num), "--json", "mergeable"], repo_path)
+                        if merge_result.returncode == 0:
+                            mergeable = _json.loads(merge_result.stdout).get("mergeable", "")
                     if mergeable == "CONFLICTING":
                         log.info("PR #%s has merge conflicts, requesting changes without agent", pr_num)
                         _gh(["pr", "review", str(pr_num), "--request-changes",
