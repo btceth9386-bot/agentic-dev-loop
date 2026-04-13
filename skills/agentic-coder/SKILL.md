@@ -79,7 +79,19 @@ Do not include the issue number in the commit message — it belongs in the PR t
 
 ## Step 7 — Push and open PR
 
-1. Push the branch to origin.
+1. If the branch has merge conflicts with `origin/main`, rebase first:
+   ```bash
+   git fetch origin
+   GIT_EDITOR=true GIT_TERMINAL_PROMPT=0 git rebase origin/main
+   ```
+   - Resolve any conflicts, then:
+   ```bash
+   git add <resolved files>
+   GIT_EDITOR=true GIT_TERMINAL_PROMPT=0 git rebase --continue
+   ```
+   - Never use `git merge` — always rebase.
+
+2. Push the branch to origin.
 2. Determine PR type from the issue:
    - New feature / enhancement → `feat`
    - Bug fix → `fix`
