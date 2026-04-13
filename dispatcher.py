@@ -109,19 +109,23 @@ def _gh(args, repo_path, **kwargs):
 
 
 def poll_issues(label, repo_path):
-    """Return list of issues with `label` that carry no other state label."""
+    """Return list of issues with `label` (or any label in a list) that carry no other state label."""
     import json
-    result = _gh(["issue", "list", "--label", label, "--json", "number,title,labels", "--limit", "50"], repo_path)
-    if result.returncode != 0:
-        log.error("gh issue list failed: %s", result.stderr)
-        return []
-    issues = json.loads(result.stdout or "[]")
+    labels = label if isinstance(label, list) else [label]
+    seen = set()
     filtered = []
-    for issue in issues:
-        issue_labels = {lbl["name"] for lbl in issue.get("labels", [])}
-        other_state = issue_labels & STATE_LABELS - {label}
-        if not other_state:
-            filtered.append(issue)
+    for lbl in labels:
+        result = _gh(["issue", "list", "--label", lbl, "--json", "number,title,labels", "--limit", "50"], repo_path)
+        if result.returncode != 0:
+            log.error("gh issue list failed: %s", result.stderr)
+            continue
+        for issue in json.loads(result.stdout or "[]"):
+            if issue["number"] in seen:
+                continue
+            seen.add(issue["number"])
+            issue_labels = {l["name"] for l in issue.get("labels", [])}
+            if not (issue_labels & STATE_LABELS - set(labels)):
+                filtered.append(issue)
     return filtered
 
 
@@ -609,11 +613,17 @@ def process_issue(config, issue, role_name, role_cfg):
                 transition_label(issue_number, label_on_start, label_on_done, repo_path)
                 notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
             else:
-                curr_state = "agent-error"
-                transition_label(issue_number, label_on_start, "agent-error", repo_path)
-                error_summary = (result.stderr or result.stdout or "no output")[:500]
-                log.error("Coding agent failed for #%s: %s", issue_number, error_summary)
-                notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
+                if attempt >= 3:
+                    curr_state = "human-review-required"
+                    transition_label(issue_number, label_on_start, "human-review-required", repo_path)
+                    cleanup_workspace(config, issue_number)
+                    notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} failed coding attempts", "human-review-required")
+                else:
+                    curr_state = "agent-error"
+                    transition_label(issue_number, label_on_start, "agent-error", repo_path)
+                    error_summary = (result.stderr or result.stdout or "no output")[:500]
+                    log.error("Coding agent failed for #%s: %s", issue_number, error_summary)
+                    notify(config, f"🚨 Agent error on issue #{issue_number} ({agent['name']})\n```\n{error_summary}\n```", "agent-error")
 
         elif role_name == "review":
             if success and pr_is_approved(issue_number, repo_path):
@@ -669,24 +679,6 @@ def cleanup_merged_workspaces(config):
             notify(config, f"🧹 Issue #{issue_number} workspace cleaned up after merge", "ready-to-merge")
 
 
-def requeue_changes_requested(config):
-    """Move changes-requested issues back to todo for coder retry, or escalate after 3 attempts."""
-    import json
-    repo_path = config["pipeline"]["repo_path"]
-    issues = poll_issues("changes-requested", repo_path)
-    for issue in issues:
-        issue_number = issue["number"]
-        attempt = get_attempt_count(config, issue_number)
-        if attempt >= 3:
-            transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
-            cleanup_workspace(config, issue_number)
-            notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
-            log.info("Issue #%s escalated to human-review-required after %d attempts", issue_number, attempt)
-        else:
-            transition_label(issue_number, "changes-requested", "todo", repo_path)
-            log.info("Issue #%s requeued to todo for coder retry (attempt %d)", issue_number, attempt)
-
-
 def main():
     config = load_config()
     repo_path = config["pipeline"]["repo_path"]
@@ -700,7 +692,6 @@ def main():
     roles = config.get("roles", {})
 
     cleanup_merged_workspaces(config)
-    requeue_changes_requested(config)
 
     for role_name, role_cfg in roles.items():
         capacity = calculate_role_capacity(config, role_name)
