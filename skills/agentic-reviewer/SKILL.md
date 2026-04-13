@@ -97,6 +97,7 @@ Then exit non-zero (e.g. exit 1).
 
 ## Rules
 
+- **Always** execute all steps in full on every invocation — never skip based on a prior approval or existing review state.
 - **Never** approve a PR that does not satisfy all acceptance criteria from the issue.
 - **Never** request changes for stylistic preferences not covered by `AGENTS.md`.
 - **Never** modify any source files — your role is review only.
