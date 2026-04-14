@@ -706,7 +706,7 @@ def process_issue(config, issue, role_name, role_cfg):
             return
 
         if role_name == "coding":
-            if success or pr_exists(issue_number, repo_path):
+            if pr_exists(issue_number, repo_path):
                 curr_state = label_on_done
                 transition_label(issue_number, label_on_start, label_on_done, repo_path)
                 notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
