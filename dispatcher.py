@@ -621,10 +621,6 @@ def process_issue(config, issue, role_name, role_cfg):
 
     log.info("Picking up issue #%s for role '%s'", issue_number, role_name)
 
-    # Fresh workspace for coding retries — agent will fetch PR branch from ISSUE.md context
-    if role_name == "coding" and pickup_label == "changes-requested":
-        cleanup_workspace(config, issue_number)
-
     # Transition label to in-progress/reviewing
     if not transition_label(issue_number, pickup_label, label_on_start, repo_path):
         return
