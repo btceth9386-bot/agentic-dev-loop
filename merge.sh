@@ -28,6 +28,20 @@ for ISSUE in $ISSUE_NUMBERS; do
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) No PR found for issue #${ISSUE}, skipping"
     continue
   fi
+
+  # Remove worktree before merge so --delete-branch can succeed
+  WORKSPACE_BASE=$(grep 'workspace_base:' "$AGENTS_YML" | head -1 | sed 's/.*workspace_base: *"\(.*\)"/\1/')
+  WORKSPACE="${WORKSPACE_BASE/#\~/$HOME}/issue-${ISSUE}"
+  if [[ -d "$WORKSPACE" ]]; then
+    git worktree remove "$WORKSPACE" --force 2>/dev/null || true
+  fi
+
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Merging PR #${PR} for issue #${ISSUE}"
-  gh pr merge "$PR" --squash --delete-branch
+  if gh pr merge "$PR" --squash --delete-branch; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merged successfully"
+    # Clean up local branch if it still exists
+    git branch -D "agent/issue-${ISSUE}" 2>/dev/null || true
+  else
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merge failed (conflicts?), skipping"
+  fi
 done
