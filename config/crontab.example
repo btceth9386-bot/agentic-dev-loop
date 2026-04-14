@@ -9,6 +9,9 @@
 #
 # Then update the paths below and paste into crontab.
 
+# make sure gh command in the path
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
 # Run dispatcher every 3 minutes
 */3 * * * * cd /path/to/agentic-dev-loop && source .env && .venv/bin/python3 dispatcher.py >> /tmp/agentic-loop.log 2>> /tmp/agentic-loop.error.log
 
