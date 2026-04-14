@@ -607,3 +607,145 @@ def test_notify_skips_missing_config(base_config):
     with patch("dispatcher.urllib.request.urlopen") as mock:
         d.notify(base_config, "hello", "ready-to-merge")
     mock.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Rate limit detection & cooldown
+# ---------------------------------------------------------------------------
+
+def test_detect_rate_limit_positive():
+    assert d._detect_rate_limit("Error: rate limit exceeded, retry after 60s") is True
+    assert d._detect_rate_limit("HTTP 429 Too Many Requests") is True
+    assert d._detect_rate_limit("quota exceeded for model gpt-4") is True
+    assert d._detect_rate_limit("insufficient_quota: you have run out of credits") is True
+    assert d._detect_rate_limit("billing hard limit reached") is True
+
+
+def test_detect_rate_limit_negative():
+    assert d._detect_rate_limit("Error: file not found") is False
+    assert d._detect_rate_limit("success") is False
+    assert d._detect_rate_limit("") is False
+
+
+def test_in_cooldown_no_marker(tmp_path):
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        assert d._in_cooldown({"name": "test-agent"}) is False
+
+
+def test_in_cooldown_active(tmp_path):
+    marker = tmp_path / "agent-test-agent.cooldown"
+    marker.write_text(f"{int(time.time())}:60")
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        assert d._in_cooldown({"name": "test-agent"}) is True
+
+
+def test_in_cooldown_expired(tmp_path):
+    marker = tmp_path / "agent-test-agent.cooldown"
+    marker.write_text(f"{int(time.time()) - 3700}:60")  # 61+ min ago, 60 min cooldown
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        assert d._in_cooldown({"name": "test-agent"}) is False
+        assert not marker.exists()  # cleaned up
+
+
+def test_in_cooldown_zero_means_disabled(tmp_path):
+    marker = tmp_path / "agent-test-agent.cooldown"
+    marker.write_text(f"{int(time.time())}:0")
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        assert d._in_cooldown({"name": "test-agent"}) is False
+
+
+def test_in_cooldown_missing_field_uses_default(tmp_path):
+    marker = tmp_path / "agent-test-agent.cooldown"
+    # No duration in marker, agent has no cooldown_minutes field → default 30
+    marker.write_text(f"{int(time.time())}")
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        assert d._in_cooldown({"name": "test-agent"}) is True  # default 30 min, just started
+
+
+def test_trigger_cooldown_creates_marker(tmp_path):
+    agent = {"name": "test-agent", "cooldown_minutes": 45}
+    config = {"notifications": {}}
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        with patch("dispatcher.notify"):
+            d._trigger_cooldown(agent, config)
+    marker = tmp_path / "agent-test-agent.cooldown"
+    assert marker.exists()
+    parts = marker.read_text().split(":")
+    assert int(parts[1]) == 45
+
+
+def test_trigger_cooldown_uses_default_when_zero(tmp_path):
+    agent = {"name": "test-agent", "cooldown_minutes": 0}
+    config = {"notifications": {}}
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        with patch("dispatcher.notify"):
+            d._trigger_cooldown(agent, config)
+    marker = tmp_path / "agent-test-agent.cooldown"
+    parts = marker.read_text().split(":")
+    assert int(parts[1]) == d.DEFAULT_COOLDOWN_MINUTES
+
+
+def test_trigger_cooldown_sends_notification(tmp_path):
+    agent = {"name": "test-agent", "cooldown_minutes": 15}
+    config = {"notifications": {}}
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        with patch("dispatcher.notify") as mock_notify:
+            d._trigger_cooldown(agent, config)
+    mock_notify.assert_called_once()
+    assert "rate limit" in mock_notify.call_args[0][1].lower()
+
+
+def test_get_cooldown_minutes_explicit():
+    assert d._get_cooldown_minutes({"cooldown_minutes": 60}) == 60
+
+
+def test_get_cooldown_minutes_zero():
+    assert d._get_cooldown_minutes({"cooldown_minutes": 0}) == 0
+
+
+def test_get_cooldown_minutes_missing():
+    assert d._get_cooldown_minutes({}) == d.DEFAULT_COOLDOWN_MINUTES
+
+
+def test_pick_agent_skips_cooldown(tmp_path):
+    config = {
+        "agents": [
+            {"name": "a1", "role": "coding", "command": "cmd", "max_concurrent": 1, "cooldown_minutes": 30},
+            {"name": "a2", "role": "coding", "command": "cmd", "max_concurrent": 1},
+        ],
+    }
+    # Put a1 in cooldown
+    marker = tmp_path / "agent-a1.cooldown"
+    marker.write_text(f"{int(time.time())}:30")
+    with patch.object(d, "LOCK_DIR", tmp_path):
+        agent = d.pick_agent(config, "coding")
+    assert agent["name"] == "a2"
+
+
+def test_process_issue_rate_limit_triggers_cooldown(tmp_path, base_config):
+    """When agent output contains rate limit keywords, cooldown is triggered and issue label is reverted."""
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+    mock_result.stderr = "Error: 429 Too Many Requests - rate limit exceeded"
+
+    ws = Path(base_config["pipeline"]["workspace_base"]) / "issue-42"
+    ws.mkdir(parents=True, exist_ok=True)
+
+    with patch("dispatcher.transition_label", return_value=True) as mock_transition, \
+         patch("dispatcher.create_workspace", return_value=ws), \
+         patch("dispatcher.fetch_issue_context", return_value="# Issue"), \
+         patch("dispatcher.fetch_pr_context", return_value=None), \
+         patch("dispatcher.write_issue_context"), \
+         patch("dispatcher.post_assignment_comment"), \
+         patch("dispatcher.notify"), \
+         patch("dispatcher.run_agent", return_value=mock_result), \
+         patch("dispatcher._trigger_cooldown") as mock_cooldown, \
+         patch("dispatcher.write_state_log") as mock_log, \
+         patch.object(d, "LOCK_DIR", tmp_path):
+        d.process_issue(base_config, {"number": 42, "title": "Test", "labels": [{"name": "todo"}]}, "coding", base_config["roles"]["coding"])
+
+    mock_cooldown.assert_called_once()
+    # Check that state log was written with rate-limited
+    mock_log.assert_called_once()
+    assert mock_log.call_args[0][5] == "rate-limited"
