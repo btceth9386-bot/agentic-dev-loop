@@ -527,11 +527,16 @@ def test_fetch_pr_context_no_pr():
 
 def test_fetch_pr_context_with_pr():
     pr_list = [{"number": 7, "url": "https://github.com/x/y/pull/7", "title": "Fix #42"}]
-    with patch("dispatcher.subprocess.run", return_value=_mock_run(json.dumps(pr_list))):
+    reviews_resp = {"reviews": [{"state": "CHANGES_REQUESTED", "body": "Please fix"}]}
+    with patch("dispatcher.subprocess.run", side_effect=[
+        _mock_run(json.dumps(pr_list)),
+        _mock_run(json.dumps(reviews_resp)),
+    ]):
         result = d.fetch_pr_context(42, "/repo")
     assert "# Pull Request #7" in result
     assert "Fix #42" in result
     assert "https://github.com/x/y/pull/7" in result
+    assert "Please fix" in result
 
 
 def test_fetch_pr_context_gh_failure():
