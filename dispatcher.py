@@ -354,12 +354,19 @@ def create_workspace(config, issue_number):
     if workspace.exists():
         return workspace
     workspace.parent.mkdir(parents=True, exist_ok=True)
+    branch = f"agent/issue-{issue_number}"
+    repo = config["pipeline"]["repo_path"]
     result = subprocess.run(
-        ["git", "worktree", "add", "-b", f"agent/issue-{issue_number}", str(workspace), "origin/main"],
-        cwd=config["pipeline"]["repo_path"],
-        capture_output=True,
-        text=True,
+        ["git", "worktree", "add", "-b", branch, str(workspace), "origin/main"],
+        cwd=repo, capture_output=True, text=True,
     )
+    if result.returncode != 0 and "already exists" in result.stderr:
+        # Stale branch without worktree — delete and retry
+        subprocess.run(["git", "branch", "-D", branch], cwd=repo, capture_output=True)
+        result = subprocess.run(
+            ["git", "worktree", "add", "-b", branch, str(workspace), "origin/main"],
+            cwd=repo, capture_output=True, text=True,
+        )
     if result.returncode != 0:
         raise RuntimeError(f"git worktree add failed: {result.stderr}")
     return workspace
