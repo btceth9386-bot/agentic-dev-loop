@@ -352,6 +352,11 @@ def _workspace_path(config, issue_number):
 def create_workspace(config, issue_number):
     workspace = _workspace_path(config, issue_number)
     if workspace.exists():
+        # Ensure workspace is up-to-date with origin/main
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=str(workspace), capture_output=True)
+        rebase = subprocess.run(["git", "rebase", "origin/main"], cwd=str(workspace), capture_output=True)
+        if rebase.returncode != 0:
+            subprocess.run(["git", "rebase", "--abort"], cwd=str(workspace), capture_output=True)
         return workspace
     workspace.parent.mkdir(parents=True, exist_ok=True)
     branch = f"agent/issue-{issue_number}"
@@ -380,7 +385,7 @@ def cleanup_workspace(config, issue_number):
         cwd=repo_path, capture_output=True,
     )
     subprocess.run(
-        ["git", "branch", "-d", f"agent/issue-{issue_number}"],
+        ["git", "branch", "-D", f"agent/issue-{issue_number}"],
         cwd=repo_path, capture_output=True,
     )
     current = Path(os.path.expanduser(config["pipeline"]["state_base"])).parent / "current" / f"issue-{issue_number}"
@@ -620,6 +625,7 @@ def process_issue(config, issue, role_name, role_cfg):
         workspace = create_workspace(config, issue_number)
     except Exception as e:
         log.error("Workspace creation failed for #%s: %s", issue_number, e)
+        transition_label(issue_number, label_on_start, pickup_label, repo_path)
         return
 
     # Write ISSUE.md

@@ -20,7 +20,7 @@ cd "$REPO_PATH"
 
 export GH_TOKEN="${CODER_GH_TOKEN:?CODER_GH_TOKEN is not set}"
 
-ISSUE_NUMBERS=$(gh issue list --label "ready-to-merge" --json number --jq '.[].number')
+ISSUE_NUMBERS=$(gh issue list --label "ready-to-merge" --json number --jq '.[].number' || true)
 
 for ISSUE in $ISSUE_NUMBERS; do
   PR=$(gh pr list --head "agent/issue-${ISSUE}" --json number --jq '.[0].number')
