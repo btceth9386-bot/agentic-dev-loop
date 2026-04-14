@@ -28,6 +28,11 @@ TOKEN_MAP = {
     "review": "${REVIEWER_GH_TOKEN}",
 }
 
+PROMPT_MAP = {
+    "coding": "You are a coder",
+    "review": "You are a code reviewer",
+}
+
 # Find the agent block
 pattern = rf'(- name: {re.escape(name)}\n\s+role: )\S+'
 if not re.search(pattern, content):
@@ -46,7 +51,13 @@ if role in TOKEN_MAP:
     if re.search(token_pattern, content):
         content = re.sub(token_pattern, rf'\g<1>"{TOKEN_MAP[role]}"', content, count=1)
 
+# Replace prompt in command within the same agent block
+if role in PROMPT_MAP:
+    cmd_pattern = rf'(- name: {re.escape(name)}\n(?:.*\n){{0,3}}?\s+command: "[^"]*?)You are a cod(?:er|e reviewer)'
+    if re.search(cmd_pattern, content):
+        content = re.sub(cmd_pattern, rf'\g<1>{PROMPT_MAP[role]}', content, count=1)
+
 with open(path, "w") as f:
     f.write(content)
-print(f"✅ Agent '{name}' role set to '{role}', GH_TOKEN set to {TOKEN_MAP.get(role, 'unchanged')}")
+print(f"✅ Agent '{name}' role set to '{role}', GH_TOKEN set to {TOKEN_MAP.get(role, 'unchanged')}, prompt set to '{PROMPT_MAP.get(role, 'unchanged')}'")
 PYEOF
