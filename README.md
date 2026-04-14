@@ -147,6 +147,16 @@ Three GitHub tokens are required:
 
 For manual runs: `source .env && .venv/bin/python3 dispatcher.py`
 
+### Claude CLI OAuth token
+
+If your Claude agent uses OAuth login (`claude auth login`), you must also set `CLAUDE_CODE_OAUTH_TOKEN` in `.env`. crontab does not source `~/.zshrc`, so the token won't be available otherwise:
+
+```bash
+# In your interactive shell (where claude is already logged in):
+echo $CLAUDE_CODE_OAUTH_TOKEN
+# Copy the value into .env
+```
+
 **3. Install agent skills**
 
 Copy or symlink the skills into your agent CLI's skills directory so agents know how to behave as coder or reviewer:
