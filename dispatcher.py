@@ -198,6 +198,18 @@ def fetch_pr_context(issue_number, repo_path):
         "## Title",
         pr.get("title", ""),
     ]
+
+    # Include latest review comments so agent sees change requests (e.g. merge conflicts)
+    detail = _gh(["pr", "view", str(pr["number"]), "--json", "reviews"], repo_path)
+    if detail.returncode == 0:
+        reviews = json.loads(detail.stdout).get("reviews", [])
+        # Only include CHANGES_REQUESTED reviews (most recent first)
+        change_reviews = [r for r in reviews if r.get("state") == "CHANGES_REQUESTED" and r.get("body")]
+        if change_reviews:
+            lines.append("## Review Feedback (changes requested)")
+            for r in change_reviews[-3:]:  # last 3 at most
+                lines.append(f"- {r['body']}")
+
     return "\n".join(lines)
 
 
