@@ -62,7 +62,7 @@ def load_config(path=AGENTS_YML):
         for field in ("name", "role", "command", "max_concurrent"):
             if field not in agent:
                 raise ValueError(f"Agent missing required field '{field}': {agent}")
-        agent.setdefault("cooldown_minutes", 0)
+        # cooldown_minutes: 0 = disabled, missing = default 30min on rate limit
         agent.setdefault("env", {})
 
     # Validate roles
@@ -403,6 +403,14 @@ def calculate_role_capacity(config, role):
     return max(0, total - used)
 
 
+def _get_cooldown_minutes(agent):
+    """Return cooldown duration. 0 = explicitly disabled. Missing = default 30."""
+    val = agent.get("cooldown_minutes")
+    if val is None:
+        return DEFAULT_COOLDOWN_MINUTES
+    return val  # 0 means disabled
+
+
 def _in_cooldown(agent):
     marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
     if not marker.exists():
@@ -410,8 +418,12 @@ def _in_cooldown(agent):
     try:
         parts = marker.read_text().strip().split(":")
         ts = int(parts[0])
-        cooldown = int(parts[1]) if len(parts) > 1 else (agent.get("cooldown_minutes", 0) or DEFAULT_COOLDOWN_MINUTES)
+        # Duration from marker file takes priority (set by disable script or trigger)
+        cooldown = int(parts[1]) if len(parts) > 1 else _get_cooldown_minutes(agent)
     except (ValueError, IndexError):
+        marker.unlink(missing_ok=True)
+        return False
+    if cooldown <= 0:
         marker.unlink(missing_ok=True)
         return False
     elapsed = (time.time() - ts) / 60
@@ -441,12 +453,14 @@ def _detect_rate_limit(output: str) -> bool:
 
 
 def _trigger_cooldown(agent, config):
-    """Set cooldown marker for an agent. Uses agent's cooldown_minutes or default."""
-    cooldown = agent.get("cooldown_minutes") or DEFAULT_COOLDOWN_MINUTES
+    """Set cooldown marker for an agent. Uses agent's cooldown_minutes or default 30."""
+    cooldown = _get_cooldown_minutes(agent)
+    if cooldown <= 0:
+        cooldown = DEFAULT_COOLDOWN_MINUTES  # force cooldown even if config says 0
     marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
     marker.write_text(f"{int(time.time())}:{cooldown}")
     log.warning("⏸️  Agent '%s' put in cooldown for %d minutes (rate limit detected)", agent["name"], cooldown)
-    notify(config, f"⏸️ Agent **{agent['name']}** hit rate limit — cooldown {cooldown}min.\nTo disable: `bash scripts/disable-agent.sh {agent['name']}`", "agent-error")
+    notify(config, f"⏸️ Agent **{agent['name']}** hit rate limit — cooldown {cooldown}min.\nTo disable: `bash scripts/disable-agent-cooldown.sh {agent['name']}`", "agent-error")
 
 
 def pick_agent(config, role):

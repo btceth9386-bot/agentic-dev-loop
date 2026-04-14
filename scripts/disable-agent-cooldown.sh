@@ -1,7 +1,7 @@
 #!/bin/bash
 # disable-agent.sh — temporarily disable an agent by setting a long cooldown
 # Usage: ./scripts/disable-agent.sh <agent-name> [minutes]
-# Default: 1440 minutes (24 hours). Use 0 to re-enable (same as enable-agent.sh).
+# Default: 1440 minutes (24 hours). Use 0 to re-enable (same as enable-agent-cooldown.sh).
 
 set -euo pipefail
 
@@ -17,5 +17,5 @@ else
   echo "$(date +%s):${MINUTES}" > "$MARKER"
   echo "⏸️  Agent '${AGENT_NAME}' disabled for ${MINUTES} minutes"
   echo "   Marker: ${MARKER}"
-  echo "   To re-enable: ./scripts/enable-agent.sh ${AGENT_NAME}"
+  echo "   To re-enable: ./scripts/enable-agent-cooldown.sh ${AGENT_NAME}"
 fi

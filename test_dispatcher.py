@@ -59,7 +59,7 @@ def test_load_config_valid(tmp_path):
     p = tmp_path / "agents.yml"
     p.write_text(yaml.dump(cfg))
     result = d.load_config(p)
-    assert result["agents"][0]["cooldown_minutes"] == 0  # default applied
+    assert result["agents"][0].get("cooldown_minutes") is None  # missing = default 30 on rate limit
 
 
 def test_load_config_missing_agent_field(tmp_path):
