@@ -460,7 +460,7 @@ def _trigger_cooldown(agent, config):
     marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
     marker.write_text(f"{int(time.time())}:{cooldown}")
     log.warning("⏸️  Agent '%s' put in cooldown for %d minutes (rate limit detected)", agent["name"], cooldown)
-    notify(config, f"⏸️ Agent **{agent['name']}** hit rate limit — cooldown {cooldown}min.\nTo disable: `bash scripts/disable-agent-cooldown.sh {agent['name']}`", "agent-error")
+    notify(config, f"⏸️ Agent **{agent['name']}** hit rate limit — cooldown {cooldown}min.\nTo disable: `bash scripts/enable-agent-cooldown.sh {agent['name']}`", "agent-error")
 
 
 def pick_agent(config, role):
