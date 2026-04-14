@@ -46,7 +46,7 @@ for ISSUE in $ISSUE_NUMBERS; do
     MERGEABLE=$(gh pr view "$PR" --json mergeable --jq '.mergeable' 2>/dev/null || echo "UNKNOWN")
     if [[ "$MERGEABLE" == "CONFLICTING" ]]; then
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} has merge conflicts, sending back to coder"
-      gh pr review "$PR" --request-changes --body "Merge conflicts with main after another PR was merged. Please rebase and resolve." 2>/dev/null || true
+      GH_TOKEN="${REVIEWER_GH_TOKEN:-$CODER_GH_TOKEN}" gh pr review "$PR" --request-changes --body "Merge conflicts with main after another PR was merged. Please rebase and resolve." 2>/dev/null || true
       gh issue edit "$ISSUE" --remove-label "ready-to-merge" --add-label "changes-requested" 2>/dev/null || true
     else
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merge failed (mergeable=$MERGEABLE), skipping"
