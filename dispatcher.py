@@ -404,17 +404,49 @@ def calculate_role_capacity(config, role):
 
 
 def _in_cooldown(agent):
-    cooldown = agent.get("cooldown_minutes", 0)
-    if not cooldown:
-        return False
     marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
     if not marker.exists():
         return False
-    elapsed = (time.time() - marker.stat().st_mtime) / 60
+    try:
+        parts = marker.read_text().strip().split(":")
+        ts = int(parts[0])
+        cooldown = int(parts[1]) if len(parts) > 1 else (agent.get("cooldown_minutes", 0) or DEFAULT_COOLDOWN_MINUTES)
+    except (ValueError, IndexError):
+        marker.unlink(missing_ok=True)
+        return False
+    elapsed = (time.time() - ts) / 60
     if elapsed >= cooldown:
         marker.unlink(missing_ok=True)
         return False
     return True
+
+
+# Rate limit / quota keywords per agent CLI
+RATE_LIMIT_PATTERNS = [
+    "rate limit", "rate_limit", "ratelimit",
+    "too many requests", "429",
+    "quota exceeded", "quota_exceeded",
+    "out of credits", "insufficient_quota",
+    "billing", "usage limit",
+    "capacity", "overloaded",
+]
+
+DEFAULT_COOLDOWN_MINUTES = 30
+
+
+def _detect_rate_limit(output: str) -> bool:
+    """Return True if agent output indicates a rate limit or quota error."""
+    lower = output.lower()
+    return any(p in lower for p in RATE_LIMIT_PATTERNS)
+
+
+def _trigger_cooldown(agent, config):
+    """Set cooldown marker for an agent. Uses agent's cooldown_minutes or default."""
+    cooldown = agent.get("cooldown_minutes") or DEFAULT_COOLDOWN_MINUTES
+    marker = LOCK_DIR / f"agent-{agent['name']}.cooldown"
+    marker.write_text(f"{int(time.time())}:{cooldown}")
+    log.warning("⏸️  Agent '%s' put in cooldown for %d minutes (rate limit detected)", agent["name"], cooldown)
+    notify(config, f"⏸️ Agent **{agent['name']}** hit rate limit — cooldown {cooldown}min.\nTo disable: `bash scripts/disable-agent.sh {agent['name']}`", "agent-error")
 
 
 def pick_agent(config, role):
@@ -649,6 +681,15 @@ def process_issue(config, issue, role_name, role_cfg):
         log.info("Running agent '%s' on issue #%s", agent["name"], issue_number)
         result = run_agent(agent, workspace)
         success = result.returncode == 0
+
+        # Detect rate limit / quota errors and trigger cooldown
+        agent_output = (result.stderr or "") + (result.stdout or "")
+        if not success and _detect_rate_limit(agent_output):
+            _trigger_cooldown(agent, config)
+            # Revert label so issue can be picked up by another agent next cycle
+            transition_label(issue_number, label_on_start, pickup_label, repo_path)
+            write_state_log(config, issue_number, agent["name"], role_name, label_on_start, "rate-limited", attempt, result.stdout, result.stderr)
+            return
 
         if role_name == "coding":
             if success or pr_exists(issue_number, repo_path):
