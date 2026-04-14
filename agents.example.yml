@@ -6,11 +6,20 @@ pipeline:
 agents:
   # Add --resume flags to command if the CLI supports session resume
   # Use the env field to inject per-agent environment variables (e.g. separate GH_TOKEN per agent)
+  #
+  # cooldown_minutes: auto-cooldown duration when rate limit is detected
+  #   30 (or any number) = cooldown for N minutes on rate limit
+  #   0 = explicitly disable auto-cooldown
+  #   (omit field) = default 30 minutes
+  #
+  # Manual cooldown: scripts/enable-agent-cooldown.sh <agent> [minutes]
+  # Remove cooldown:  scripts/disable-agent-cooldown.sh <agent>
+
   - name: kiro-cli
     role: coding
     command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md first then begin'"
     max_concurrent: 2
-    cooldown_minutes: 0
+    cooldown_minutes: 30
     env:
       GH_TOKEN: "${CODER_GH_TOKEN}"
 
@@ -18,7 +27,7 @@ agents:
     role: review
     command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-6 -p 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
-    cooldown_minutes: 0
+    cooldown_minutes: 30
     env:
       GH_TOKEN: "${REVIEWER_GH_TOKEN}"
 
@@ -26,7 +35,7 @@ agents:
     role: review
     command: "codex exec --yolo --skip-git-repo-check --model gpt-5.4 resume --last 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
-    cooldown_minutes: 0
+    cooldown_minutes: 30
     env:
       GH_TOKEN: "${REVIEWER_GH_TOKEN}"
 

@@ -261,6 +261,30 @@ The `env` map is merged into the subprocess environment at spawn time, overridin
 
 > ⚠️ The reviewer GitHub account must be added as a **collaborator with Write access** to the target repo, otherwise `gh pr review` will fail. Go to repo **Settings → Collaborators → Add people**.
 
+### Rate limit & cooldown
+
+When an agent hits a rate limit or quota error, the dispatcher automatically:
+1. Puts the agent in cooldown (skipped by `pick_agent` until cooldown expires)
+2. Reverts the issue label so another agent can pick it up next cycle
+3. Sends a notification with the cooldown duration
+
+`cooldown_minutes` in `agents.yml` controls the duration:
+
+| Setting | Behavior |
+|---------|----------|
+| `cooldown_minutes: 30` | Cooldown 30 min on rate limit |
+| `cooldown_minutes: 0` | Explicitly disable auto-cooldown |
+| _(omit field)_ | Default 30 min |
+
+Manual control:
+```bash
+# Put agent into cooldown for 2 hours
+bash scripts/enable-agent-cooldown.sh codex 120
+
+# Remove cooldown (re-enable agent)
+bash scripts/disable-agent-cooldown.sh codex
+```
+
 ## Observability
 
 ```bash

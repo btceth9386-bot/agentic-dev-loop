@@ -20,7 +20,9 @@ agentic-dev-loop/
   scripts/
     setup-repo.sh        # Create GitHub labels and configure target repo
     rotate-role.sh       # Swap an agent's role in agents.yml
-    monitor.sh            # Print current pipeline state
+    monitor.sh           # Pipeline monitoring dashboard
+    enable-agent-cooldown.sh   # Put an agent into cooldown
+    disable-agent-cooldown.sh  # Remove cooldown from an agent
     test-notifications.py # Test Telegram/Discord notifications
   skills/
     agentic-coder/SKILL.md    # Skill for coding agents
@@ -159,7 +161,7 @@ agents:
     role: coding
     command: "kiro-cli chat --resume --agent senior --no-interactive --trust-all-tools 'You are a coder. Read ISSUE.md first then begin'"
     max_concurrent: 2
-    cooldown_minutes: 0
+    cooldown_minutes: 30
     env:
       GH_TOKEN: "${CODER_GH_TOKEN}"
 
@@ -167,7 +169,7 @@ agents:
     role: review
     command: "claude --dangerously-skip-permissions --continue --model claude-sonnet-4-6 -p 'You are a code reviewer. Read ISSUE.md then begin.'"
     max_concurrent: 1
-    cooldown_minutes: 0
+    cooldown_minutes: 30
     env:
       GH_TOKEN: "${REVIEWER_GH_TOKEN}"
 

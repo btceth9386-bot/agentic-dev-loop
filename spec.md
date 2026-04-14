@@ -136,19 +136,19 @@ agents:
     role: coding
     command: "kiro-cli --agent senior --no-interactive"
     max_concurrent: 2
-    cooldown_minutes: 0
+    cooldown_minutes: 30
 
   - name: claude
     role: review
     command: "claude --dangerously-skip-permissions -p ''"
     max_concurrent: 1
-    cooldown_minutes: 0
+    cooldown_minutes: 30
 
   - name: codex
     role: coding
     command: "codex --no-interactive"
     max_concurrent: 1
-    cooldown_minutes: 0
+    cooldown_minutes: 30
 
 roles:
   coding:
@@ -172,6 +172,7 @@ roles:
 - `cooldown_minutes` triggers after rate limit detection
 - Dispatcher automatically rotates to next available agent with same role
 - Notification sent when rotation occurs
+- Manual control: `scripts/enable-agent-cooldown.sh` / `scripts/disable-agent-cooldown.sh`
 
 ---
 
