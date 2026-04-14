@@ -364,11 +364,6 @@ def _workspace_path(config, issue_number):
 def create_workspace(config, issue_number):
     workspace = _workspace_path(config, issue_number)
     if workspace.exists():
-        # Ensure workspace is up-to-date with origin/main
-        subprocess.run(["git", "fetch", "origin", "main"], cwd=str(workspace), capture_output=True)
-        rebase = subprocess.run(["git", "rebase", "origin/main"], cwd=str(workspace), capture_output=True)
-        if rebase.returncode != 0:
-            subprocess.run(["git", "rebase", "--abort"], cwd=str(workspace), capture_output=True)
         return workspace
     workspace.parent.mkdir(parents=True, exist_ok=True)
     branch = f"agent/issue-{issue_number}"
@@ -625,6 +620,10 @@ def process_issue(config, issue, role_name, role_cfg):
         pickup_label = matched.pop() if matched else pickup_label[0]
 
     log.info("Picking up issue #%s for role '%s'", issue_number, role_name)
+
+    # Fresh workspace for coding retries — agent will fetch PR branch from ISSUE.md context
+    if role_name == "coding" and pickup_label == "changes-requested":
+        cleanup_workspace(config, issue_number)
 
     # Transition label to in-progress/reviewing
     if not transition_label(issue_number, pickup_label, label_on_start, repo_path):
