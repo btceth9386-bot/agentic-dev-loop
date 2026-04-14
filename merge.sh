@@ -42,6 +42,14 @@ for ISSUE in $ISSUE_NUMBERS; do
     # Clean up local branch if it still exists
     git branch -D "agent/issue-${ISSUE}" 2>/dev/null || true
   else
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merge failed (conflicts?), skipping"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merge failed, checking for conflicts"
+    MERGEABLE=$(gh pr view "$PR" --json mergeable --jq '.mergeable' 2>/dev/null || echo "UNKNOWN")
+    if [[ "$MERGEABLE" == "CONFLICTING" ]]; then
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} has merge conflicts, sending back to coder"
+      gh pr review "$PR" --request-changes --body "Merge conflicts with main after another PR was merged. Please rebase and resolve." 2>/dev/null || true
+      gh issue edit "$ISSUE" --remove-label "ready-to-merge" --add-label "changes-requested" 2>/dev/null || true
+    else
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) PR #${PR} merge failed (mergeable=$MERGEABLE), skipping"
+    fi
   fi
 done
