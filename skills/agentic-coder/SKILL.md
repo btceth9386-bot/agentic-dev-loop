@@ -33,13 +33,18 @@ autonomously. Do not ask for confirmation. Exit 0 on success, non-zero on failur
 If `ISSUE.md` contains a `## Pull Request` section:
 - A PR already exists for this branch. You are on a **retry** — do not create a new PR.
 - Read the `## Review Feedback (changes requested)` section carefully.
-- If feedback mentions **merge conflicts**, you must rebase onto `origin/main` before doing anything else:
+- **Always check the PR's merge status**, even if the local branch looks clean:
+  ```bash
+  gh pr view <pr_number> --json mergeable --jq '.mergeable'
+  ```
+  If the result is `CONFLICTING`, you must rebase onto `origin/main`:
   ```bash
   git fetch origin
   GIT_EDITOR=true GIT_TERMINAL_PROMPT=0 git rebase origin/main
   ```
   Resolve conflicts, `git add` resolved files, then `git rebase --continue`.
-- If feedback mentions code issues, fix them.
+  Push with `git push --force-with-lease`.
+- If review feedback mentions code issues, fix them.
 - After addressing all feedback, commit, push (`--force-with-lease` after rebase), and exit 0.
 
 If no `## Pull Request` section exists, this is a fresh implementation — proceed to Step 4.
