@@ -45,7 +45,12 @@ If `ISSUE.md` contains a `## Pull Request` section:
   Resolve conflicts, `git add` resolved files, then `git rebase --continue`.
   Push with `git push --force-with-lease`.
 - If review feedback mentions code issues, fix them.
-- After addressing all feedback, commit, push (`--force-with-lease` after rebase), and exit 0.
+- After addressing all feedback, commit, push (`--force-with-lease` after rebase), and verify:
+  ```bash
+  sleep 5  # wait for GitHub to recompute
+  gh pr view <pr_number> --json mergeable --jq '.mergeable'
+  ```
+  If still `CONFLICTING`, fetch and rebase again — `origin/main` may have moved since your last fetch.
 
 If no `## Pull Request` section exists, this is a fresh implementation — proceed to Step 4.
 
