@@ -679,7 +679,7 @@ def process_issue(config, issue, role_name, role_cfg):
                         _gh(["pr", "review", str(pr_num), "--request-changes",
                              "--body", "This PR has merge conflicts with the base branch. Please rebase or merge main and resolve all conflicts before this can be reviewed."],
                             repo_path)
-                        if attempt >= 3:
+                        if attempt > 3:
                             transition_label(issue_number, label_on_start, "human-review-required", repo_path)
                             cleanup_workspace(config, issue_number)
                             notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} failed conflict resolution attempts", "human-review-required")
