@@ -28,7 +28,23 @@ autonomously. Do not ask for confirmation. Exit 0 on success, non-zero on failur
 2. Identify files likely to be affected by the issue.
 3. Check existing tests to understand the testing conventions used.
 
-## Step 3 — Plan before coding
+## Step 3 — Check for existing PR and review feedback
+
+If `ISSUE.md` contains a `## Pull Request` section:
+- A PR already exists for this branch. You are on a **retry** — do not create a new PR.
+- Read the `## Review Feedback (changes requested)` section carefully.
+- If feedback mentions **merge conflicts**, you must rebase onto `origin/main` before doing anything else:
+  ```bash
+  git fetch origin
+  GIT_EDITOR=true GIT_TERMINAL_PROMPT=0 git rebase origin/main
+  ```
+  Resolve conflicts, `git add` resolved files, then `git rebase --continue`.
+- If feedback mentions code issues, fix them.
+- After addressing all feedback, commit, push (`--force-with-lease` after rebase), and exit 0.
+
+If no `## Pull Request` section exists, this is a fresh implementation — proceed to Step 4.
+
+## Step 4 — Plan before coding
 
 Before writing any code, briefly plan:
 - What files need to change?
@@ -37,21 +53,21 @@ Before writing any code, briefly plan:
 
 Prefer minimal, focused changes. Do not refactor unrelated code.
 
-## Step 4 — Implement
+## Step 5 — Implement
 
 1. Make the changes required by the issue.
 2. Follow the conventions in `AGENTS.md` strictly (naming, structure, patterns).
 3. Handle edge cases and errors explicitly.
 4. Do not leave debug code, commented-out blocks, or TODOs.
 
-## Step 5 — Write tests
+## Step 6 — Write tests
 
 1. Add or update tests to cover the new behaviour.
 2. Follow the existing test conventions (framework, file location, naming).
 3. Run the test suite and confirm all tests pass before committing.
    - If tests cannot be run (missing deps, env), note it in the PR body.
 
-## Step 6 — Commit
+## Step 7 — Commit
 
 Follow the `conventional-commit` skill conventions. Each commit should be a single,
 stable change. Determine the type from the issue:
@@ -77,7 +93,7 @@ feat(dispatcher): add per-agent env map for credential isolation
 
 Do not include the issue number in the commit message — it belongs in the PR title.
 
-## Step 7 — Push and open PR
+## Step 8 — Push and open PR
 
 1. If the branch has merge conflicts with `origin/main`, rebase first:
    ```bash
@@ -90,30 +106,16 @@ Do not include the issue number in the commit message — it belongs in the PR t
    GIT_EDITOR=true GIT_TERMINAL_PROMPT=0 git rebase --continue
    ```
    - Never use `git merge` — always rebase.
+   - After rebase, you must use `git push --force-with-lease` (rebase rewrites history).
 
-2. Push the branch to origin.
-2. Determine PR type from the issue:
-   - New feature / enhancement → `feat`
-   - Bug fix → `fix`
+2. Push the branch to origin. Use `--force-with-lease` if you rebased.
 
-3. Create the PR with title:
-   ```
-   feat(<scope>): <short description> (#<issue_number>)
-   ```
-   or
-   ```
-   fix(<scope>): <short description> (#<issue_number>)
-   ```
-   Example: `feat(dispatcher): add per-agent env map (#42)`
-
-4. In the PR body, use the appropriate closing keyword:
-   - Feature: `resolve #<issue_number>`
-   - Bug fix: `fix #<issue_number>`
-
-5. Also include in the PR body:
-   - What was changed and why
-   - How to test it
-   - Any known limitations or follow-up items
+3. **If a PR already exists** (retry case from Step 3): do NOT create a new PR. Just push — the existing PR updates automatically. Exit 0.
+4. **If no PR exists** (fresh implementation), create the PR:
+   - Title: `feat(<scope>): <short description> (#<issue_number>)` or `fix(...)` for bugs
+   - Example: `feat(dispatcher): add per-agent env map (#42)`
+   - Body: use `resolve #<issue_number>` (feature) or `fix #<issue_number>` (bug)
+   - Also include: what changed, how to test, any known limitations
 
 ## Rules
 
