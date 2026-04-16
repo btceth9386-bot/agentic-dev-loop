@@ -334,8 +334,10 @@ def test_get_next_log_index_sequential(tmp_path, base_config):
 
 
 def test_get_attempt_count(tmp_path, base_config):
+    # Only coding role pr-opened logs count as attempts
+    d.write_state_log(base_config, 5, "codex", "coding", "in-progress", "pr-opened", 1)
     d.write_state_log(base_config, 5, "claude", "review", "reviewing", "changes-requested", 1)
-    d.write_state_log(base_config, 5, "claude", "review", "reviewing", "changes-requested", 2)
+    d.write_state_log(base_config, 5, "codex", "coding", "in-progress", "pr-opened", 2)
     assert d.get_attempt_count(base_config, 5) == 2
 
 

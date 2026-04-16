@@ -530,8 +530,17 @@ def get_next_log_index(config, issue_number):
 
 
 def get_attempt_count(config, issue_number):
+    """Count how many times the coding agent has run for this issue."""
     d = _state_dir(config, issue_number)
-    return len(list(d.glob("*-changes-requested.log")))
+    count = 0
+    for f in d.glob("*-pr-opened.log"):
+        try:
+            content = yaml.safe_load(f.read_text())
+            if content.get("role") == "coding":
+                count += 1
+        except Exception:
+            count += 1
+    return count
 
 
 def write_state_log(config, issue_number, agent_name, role, prev_state, curr_state, attempt, stdout="", stderr=""):
