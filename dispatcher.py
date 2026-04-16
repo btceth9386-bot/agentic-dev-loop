@@ -670,9 +670,15 @@ def process_issue(config, issue, role_name, role_cfg):
                         _gh(["pr", "review", str(pr_num), "--request-changes",
                              "--body", "This PR has merge conflicts with the base branch. Please rebase or merge main and resolve all conflicts before this can be reviewed."],
                             repo_path)
-                        transition_label(issue_number, label_on_start, "changes-requested", repo_path)
-                        notify(config, f"🔀 PR #{pr_num} has merge conflicts — changes requested on issue #{issue_number}", "changes-requested")
-                        write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "changes-requested", attempt)
+                        if attempt >= 3:
+                            transition_label(issue_number, label_on_start, "human-review-required", repo_path)
+                            cleanup_workspace(config, issue_number)
+                            notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} failed conflict resolution attempts", "human-review-required")
+                            write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "human-review-required", attempt)
+                        else:
+                            transition_label(issue_number, label_on_start, "changes-requested", repo_path)
+                            notify(config, f"🔀 PR #{pr_num} has merge conflicts — changes requested on issue #{issue_number}", "changes-requested")
+                            write_state_log(config, issue_number, "dispatcher", role_name, label_on_start, "changes-requested", attempt)
                         return
 
                 # Check PR author != reviewer to avoid self-approval error
@@ -729,7 +735,10 @@ def process_issue(config, issue, role_name, role_cfg):
             if pr_exists(issue_number, repo_path):
                 curr_state = label_on_done
                 transition_label(issue_number, label_on_start, label_on_done, repo_path)
-                notify(config, f"✅ PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
+                if attempt > 1:
+                    notify(config, f"🔄 PR updated for issue #{issue_number} by {agent['name']} (attempt {attempt})", label_on_done)
+                else:
+                    notify(config, f"🔔 PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
             else:
                 if attempt >= 3:
                     curr_state = "human-review-required"
