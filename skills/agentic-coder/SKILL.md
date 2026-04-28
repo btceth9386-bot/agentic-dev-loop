@@ -122,6 +122,7 @@ Do not include the issue number in the commit message — it belongs in the PR t
 
 3. **If a PR already exists** (retry case from Step 3): do NOT create a new PR. Just push — the existing PR updates automatically. Exit 0.
 4. **If no PR exists** (fresh implementation), create the PR:
+   - **Do NOT use `--draft`** — create a regular (ready for review) PR
    - Title: `feat(<scope>): <short description> (#<issue_number>)` or `fix(...)` for bugs
    - Example: `feat(dispatcher): add per-agent env map (#42)`
    - Body: use `resolve #<issue_number>` (feature) or `fix #<issue_number>` (bug)
