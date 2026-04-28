@@ -765,7 +765,7 @@ def _process_issue_inner(config, issue_number, pickup_label, label_on_start, lab
                 else:
                     notify(config, f"🔔 PR opened for issue #{issue_number} by {agent['name']}", label_on_done)
             else:
-                if attempt >= 3:
+                if attempt > 3:
                     curr_state = "human-review-required"
                     transition_label(issue_number, label_on_start, "human-review-required", repo_path)
                     cleanup_workspace(config, issue_number)
@@ -794,7 +794,7 @@ def _process_issue_inner(config, issue_number, pickup_label, label_on_start, lab
                     transition_label(issue_number, label_on_start, "changes-requested", repo_path)
                     notify(config, f"🔄 Changes requested for issue #{issue_number} (attempt {attempt})", "changes-requested")
 
-                    if attempt >= 3:
+                    if attempt > 3:
                         transition_label(issue_number, "changes-requested", "human-review-required", repo_path)
                         cleanup_workspace(config, issue_number)
                         notify(config, f"🚨 Issue #{issue_number} escalated to human review after {attempt} attempts", "human-review-required")
