@@ -634,6 +634,20 @@ def process_issue(config, issue, role_name, role_cfg):
     if not transition_label(issue_number, pickup_label, label_on_start, repo_path):
         return
 
+    try:
+        _process_issue_inner(config, issue_number, pickup_label, label_on_start, label_on_done, role_name, role_cfg, repo_path)
+    except Exception as e:
+        log.error("Unexpected error processing #%s, reverting label: %s", issue_number, e)
+        # Only revert if label is still in the "started" state (in-progress/reviewing)
+        import json as _json
+        check = _gh(["issue", "view", str(issue_number), "--json", "labels"], repo_path)
+        if check.returncode == 0:
+            current_labels = {l["name"] for l in _json.loads(check.stdout).get("labels", [])}
+            if label_on_start in current_labels:
+                transition_label(issue_number, label_on_start, pickup_label, repo_path)
+
+
+def _process_issue_inner(config, issue_number, pickup_label, label_on_start, label_on_done, role_name, role_cfg, repo_path):
     attempt = get_attempt_count(config, issue_number) + 1
 
     # Workspace
