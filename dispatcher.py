@@ -733,10 +733,12 @@ def _process_issue_inner(config, issue_number, pickup_label, label_on_start, lab
     agent = pick_agent(config, role_name)
     if not agent:
         log.warning("No available agent for role '%s', skipping #%s", role_name, issue_number)
+        transition_label(issue_number, label_on_start, pickup_label, repo_path)
         return
 
     if not acquire_lock(agent["name"], issue_number):
         log.warning("Could not acquire lock for agent %s issue #%s", agent["name"], issue_number)
+        transition_label(issue_number, label_on_start, pickup_label, repo_path)
         return
 
     try:
